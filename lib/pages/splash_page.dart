@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class SplashPage extends StatefulWidget {
   final VoidCallback onInitializationComplete;
@@ -18,6 +19,9 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
+    _setup().then(
+      (_) => widget.onInitializationComplete(),
+    );
   }
 
   @override
@@ -40,4 +44,12 @@ class _SplashPageState extends State<SplashPage> {
       ),
     );
   }
+
+  Future<void> _setup() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
+    _registerServices();
+  }
+
+  void _registerServices() {}
 }
