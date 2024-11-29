@@ -1,112 +1,12 @@
-// import 'dart:developer';
-
-// import 'package:finance_tracker/auth/login_screen.dart';
-// import 'package:finance_tracker/home_screen.dart';
-// import 'package:finance_tracker/widgets/button.dart';
-// import 'package:finance_tracker/widgets/textfield.dart';
-// import 'package:finance_tracker/auth/auth_service.dart';
-// import 'package:flutter/material.dart';
-
-// class SignupScreen extends StatefulWidget {
-//   const SignupScreen({super.key});
-
-//   @override
-//   State<SignupScreen> createState() => _SignupScreenState();
-// }
-
-// class _SignupScreenState extends State<SignupScreen> {
-//   final _auth = AuthService();
-
-//   final _name = TextEditingController();
-//   final _email = TextEditingController();
-//   final _password = TextEditingController();
-
-//   @override
-//   void dispose() {
-//     super.dispose();
-//     _name.dispose();
-//     _email.dispose();
-//     _password.dispose();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       body: Padding(
-//         padding: const EdgeInsets.symmetric(horizontal: 25),
-//         child: Column(
-//           children: [
-//             const Spacer(),
-//             const Text("Signup",
-//                 style: TextStyle(fontSize: 40, fontWeight: FontWeight.w500)),
-//             const SizedBox(
-//               height: 50,
-//             ),
-//             CustomTextField(
-//               hint: "Enter Name",
-//               label: "Name",
-//               controller: _name,
-//             ),
-//             const SizedBox(height: 20),
-//             CustomTextField(
-//               hint: "Enter Email",
-//               label: "Email",
-//               controller: _email,
-//             ),
-//             const SizedBox(height: 20),
-//             CustomTextField(
-//               hint: "Enter Password",
-//               label: "Password",
-//               isPassword: true,
-//               controller: _password,
-//             ),
-//             const SizedBox(height: 30),
-//             CustomButton(
-//               label: "Signup",
-//               onPressed: _signup,
-//             ),
-//             const SizedBox(height: 5),
-//             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-//               const Text("Already have an account? "),
-//               InkWell(
-//                 onTap: () => goToLogin(context),
-//                 child: const Text("Login", style: TextStyle(color: Colors.red)),
-//               )
-//             ]),
-//             const Spacer()
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   goToLogin(BuildContext context) => Navigator.push(
-//         context,
-//         MaterialPageRoute(builder: (context) => const LoginScreen()),
-//       );
-
-//   goToHome(BuildContext context) => Navigator.push(
-//         context,
-//         MaterialPageRoute(builder: (context) => const HomeScreen()),
-//       );
-
-//   _signup() async {
-//     final user =
-//         await _auth.createUserWithEmailAndPassword(_email.text, _password.text);
-//     if (user != null) {
-//       log("User Created Succesfully");
-//       goToHome(context);
-//     }
-//   }
-// }
 
 import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:finance_tracker/auth/login_screen.dart';
-import 'package:finance_tracker/home_screen.dart';
+import 'package:finance_tracker/pages/home_screen.dart';
 import 'package:finance_tracker/widgets/button.dart';
 import 'package:finance_tracker/widgets/textfield.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_tracker/auth/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -192,7 +92,7 @@ class _SignupScreenState extends State<SignupScreen> {
         MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
 
-  void goToHome(BuildContext context) => Navigator.push(
+  void goToHome(BuildContext context) => Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
@@ -222,8 +122,34 @@ class _SignupScreenState extends State<SignupScreen> {
           _email.text, _password.text);
 
       if (user != null) {
-        log("User created successfully");
-        goToHome(context);
+        // Create a new document for the user in Firestore using their UID
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'name': _name.text, // Save the name in Firestore
+          'email': _email.text,
+          'accountType': 'basic', // Default account type
+          'creationDate': FieldValue.serverTimestamp(), // Timestamp of account creation
+        });
+
+        // Create a new collection for the user's expenses
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('expenses') // Unique collection for expenses
+            .add({
+          'initialExpense': '0', // You can add a default expense if needed
+        });
+
+        // Create additional collections like 'reminders' or 'goals' for user-specific data
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('reminders') // Unique collection for reminders
+            .add({
+          'reminderMessage': 'Welcome to your personal finance tracker!', // Example reminder
+        });
+
+        log("User created successfully with unique data set.");
+        goToHome(context); // Navigate to the HomeScreen
       }
     } on FirebaseAuthException catch (e) {
       setState(() {

@@ -1,49 +1,11 @@
-// import 'dart:developer';
-
-// import 'package:firebase_auth/firebase_auth.dart';
-
-// class AuthService {
-//   final _auth = FirebaseAuth.instance;
-
-//   Future<User?> createUserWithEmailAndPassword(
-//       String email, String password) async {
-//     try {
-//       final cred = await _auth.createUserWithEmailAndPassword(
-//           email: email, password: password);
-//       return cred.user;
-//     } catch (e) {
-//       log("Something went wrong");
-//     }
-//     return null;
-//   }
-
-//   Future<User?> loginUserWithEmailAndPassword(
-//       String email, String password) async {
-//     try {
-//       final cred = await _auth.signInWithEmailAndPassword(
-//           email: email, password: password);
-//       return cred.user;
-//     } catch (e) {
-//       log("Something went wrong");
-//     }
-//     return null;
-//   }
-
-//   Future<void> signout() async {
-//     try {
-//       await _auth.signOut();
-//     } catch (e) {
-//       log("Something went wrong");
-//     }
-//   }
-// }
 
 import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthService {
-  final _auth = FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Method to create a user with email and password
   Future<User?> createUserWithEmailAndPassword(
       String email, String password) async {
     try {
@@ -59,6 +21,7 @@ class AuthService {
     }
   }
 
+  // Method to log in a user with email and password
   Future<User?> loginUserWithEmailAndPassword(
       String email, String password) async {
     try {
@@ -69,12 +32,13 @@ class AuthService {
       log("FirebaseAuthException: ${e.code}");
       rethrow; // Rethrow to let the calling method handle the error
     } catch (e) {
-      log("Error logging in user: $e");
+      log("Invalid Username or Password $e");
       rethrow;
     }
   }
 
-  Future<void> signout() async {
+  // Method to sign out the current user
+  Future<void> signOut() async {
     try {
       await _auth.signOut();
     } catch (e) {
@@ -82,6 +46,7 @@ class AuthService {
     }
   }
 
+  // Method to check if an email exists
   Future<bool> checkIfEmailExists(String email) async {
     try {
       final methods = await _auth.fetchSignInMethodsForEmail(email);
@@ -93,5 +58,10 @@ class AuthService {
       log("Error checking email existence: $e");
       rethrow;
     }
+  }
+
+  // Method to get the current logged-in user
+  User? getCurrentUser() {
+    return _auth.currentUser;
   }
 }
