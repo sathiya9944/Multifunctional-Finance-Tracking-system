@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class InviteMembersPage extends StatefulWidget {
   final Map<String, dynamic> group;
-  const InviteMembersPage({Key? key, required this.group}) : super(key: key);
+  const InviteMembersPage({super.key, required this.group});
 
   @override
   _InviteMembersPageState createState() => _InviteMembersPageState();

@@ -1,4 +1,3 @@
-
 import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -11,6 +10,7 @@ class AuthService {
     try {
       final cred = await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
+      log("User created with UID: ${cred.user?.uid}"); // Access the uid here
       return cred.user;
     } on FirebaseAuthException catch (e) {
       log("FirebaseAuthException: ${e.code}");
@@ -27,6 +27,7 @@ class AuthService {
     try {
       final cred = await _auth.signInWithEmailAndPassword(
           email: email, password: password);
+      log("User logged in with UID: ${cred.user?.uid}"); // Access the uid here
       return cred.user;
     } on FirebaseAuthException catch (e) {
       log("FirebaseAuthException: ${e.code}");
@@ -41,6 +42,7 @@ class AuthService {
   Future<void> signOut() async {
     try {
       await _auth.signOut();
+      log("User signed out successfully.");
     } catch (e) {
       log("Error signing out: $e");
     }
@@ -62,6 +64,10 @@ class AuthService {
 
   // Method to get the current logged-in user
   User? getCurrentUser() {
-    return _auth.currentUser;
+    final user = _auth.currentUser;
+    if (user != null) {
+      log("Current User UID: ${user.uid}"); // Access the uid of the logged-in user
+    }
+    return user;
   }
 }

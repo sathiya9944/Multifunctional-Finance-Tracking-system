@@ -18,19 +18,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   String? _editedExpenseName;
   double? _editedAmount;
 
-  // Reference to the Firestore collection for groups
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Function to add a new expense
   void _addExpense() {
     if (_expenseNameController.text.isNotEmpty &&
         _amountController.text.isNotEmpty) {
-      final expenseId = const Uuid().v4(); // Generate unique expense ID
+      final expenseId = const Uuid().v4();
       final expenseName = _expenseNameController.text;
       final amount = double.tryParse(_amountController.text);
 
       if (amount != null) {
-        // Add the expense to Firestore
         _firestore.collection('groups').doc(widget.groupId).update({
           'expenses': FieldValue.arrayUnion([
             {
@@ -48,11 +46,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
         _expenseNameController.clear();
         _amountController.clear();
+        Navigator.pop(context); // Close the dialog
       }
     }
   }
 
-  // Function to calculate the total expenses and remaining budget
+  // Function to calculate total expenses
   double _calculateTotalExpense(List expenses) {
     double total = 0;
     for (var expense in expenses) {
@@ -71,7 +70,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     );
   }
 
-  // Stream to fetch group data from Firestore in real time
+  // Stream to fetch group data
   Stream<DocumentSnapshot> _fetchGroupData() {
     return _firestore.collection('groups').doc(widget.groupId).snapshots();
   }
@@ -85,9 +84,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       _editedExpenseName = expenseName;
       _editedAmount = amount;
     });
+    _showExpenseDialog(true);
   }
 
-  // Function to update the edited expense in Firestore
+  // Function to update the edited expense
   void _updateExpense() {
     if (_selectedExpenseId != null &&
         _expenseNameController.text.isNotEmpty &&
@@ -96,7 +96,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       final updatedAmount = double.tryParse(_amountController.text);
 
       if (updatedAmount != null) {
-        // Update the expense in Firestore
         _firestore.collection('groups').doc(widget.groupId).update({
           'expenses': FieldValue.arrayRemove([
             {
@@ -122,7 +121,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             SnackBar(content: Text('Expense updated!')),
           );
 
-          // Clear the selected expense for editing
           setState(() {
             _selectedExpenseId = null;
             _editedExpenseName = null;
@@ -131,9 +129,53 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
           _expenseNameController.clear();
           _amountController.clear();
+          Navigator.pop(context);
         });
       }
     }
+  }
+
+  // Function to show the expense dialog
+  void _showExpenseDialog(bool isEditMode) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(isEditMode ? 'Edit Expense' : 'Add Expense'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _expenseNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Expense Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: _amountController,
+                decoration: const InputDecoration(
+                  labelText: 'Amount',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: isEditMode ? _updateExpense : _addExpense,
+              child: Text(isEditMode ? 'Update' : 'Add'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -173,49 +215,52 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Group Information
-                Text(
-                  'Group Budget: \$${groupData['budget'].toStringAsFixed(2)}',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  'Total Expenses: \$${totalExpense.toStringAsFixed(2)}',
-                  style: TextStyle(fontSize: 16),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  'Remaining Budget: \$${remainingBudget.toStringAsFixed(2)}',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 20),
-
-                // Add Expense Section
-                TextField(
-                  controller: _expenseNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Expense Name',
-                    border: OutlineInputBorder(),
+                // Center the Group Budget Card
+                Center(
+                  child: Card(
+                    elevation: 5,
+                    margin: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Group Budget',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6200EA),
+                            ),
+                          ),
+                          SizedBox(height: 10),
+                          Text(
+                            '\$${groupData['budget'].toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6200EA),
+                            ),
+                          ),
+                          SizedBox(height: 20),
+                          Text(
+                            'Total Expenses: \$${totalExpense.toStringAsFixed(2)}',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          SizedBox(height: 10),
+                          Text(
+                            'Remaining Budget: \$${remainingBudget.toStringAsFixed(2)}',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                SizedBox(height: 10),
-                TextField(
-                  controller: _amountController,
-                  decoration: InputDecoration(
-                    labelText: 'Amount',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed:
-                      _selectedExpenseId == null ? _addExpense : _updateExpense,
-                  child: Text(_selectedExpenseId == null
-                      ? 'Add Expense'
-                      : 'Update Expense'),
-                ),
-                SizedBox(height: 20),
 
                 // List of Expenses
                 Text(
@@ -246,27 +291,27 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                     },
                   ),
                 ),
-                SizedBox(height: 20),
-
-                // Large, professional "Go to Expense Sharing" Button
-                Center(
-                  child: ElevatedButton(
-                    onPressed: () => _navigateToExpenseSharing(groupData),
-                    style: ElevatedButton.styleFrom(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                      backgroundColor: Color.fromARGB(255, 253, 252, 255),
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white, // Ensure the text color is white
-                      ),
-                    ),
-                    child: Text('Expense Sharing'),
-                  ),
-                ),
               ],
             ),
+          ),
+          bottomNavigationBar: BottomNavigationBar(
+            items: [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.attach_money),
+                label: 'Split Bill',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.add),
+                label: 'Add Expense',
+              ),
+            ],
+            onTap: (index) {
+              if (index == 0) {
+                _navigateToExpenseSharing(groupData);
+              } else {
+                _showExpenseDialog(false);
+              }
+            },
           ),
         );
       },

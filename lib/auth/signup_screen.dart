@@ -1,4 +1,3 @@
-
 import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -92,10 +91,11 @@ class _SignupScreenState extends State<SignupScreen> {
         MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
 
-  void goToHome(BuildContext context) => Navigator.pushReplacement(
+  void goToHome(BuildContext context, String uid) => Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => HomeScreen(uid: uid)),
       );
+
 
   Future<void> _signup() async {
     setState(() {
@@ -110,6 +110,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     try {
+      // Check if the email already exists
       final emailExists = await _auth.checkIfEmailExists(_email.text);
       if (emailExists) {
         setState(() {
@@ -118,38 +119,42 @@ class _SignupScreenState extends State<SignupScreen> {
         return;
       }
 
+      // Create the user with email and password
       final user = await _auth.createUserWithEmailAndPassword(
           _email.text, _password.text);
 
       if (user != null) {
-        // Create a new document for the user in Firestore using their UID
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'name': _name.text, // Save the name in Firestore
+        final uid = user.uid; // Fetch the UID
+
+        // Save user data to Firestore
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'uid': uid, // Store UID explicitly in Firestore
+          'name': _name.text,
           'email': _email.text,
-          'accountType': 'basic', // Default account type
-          'creationDate': FieldValue.serverTimestamp(), // Timestamp of account creation
+          'accountType': 'basic',
+          'creationDate': FieldValue.serverTimestamp(),
         });
 
-        // Create a new collection for the user's expenses
+        // Initialize user's expenses collection
         await FirebaseFirestore.instance
             .collection('users')
-            .doc(user.uid)
-            .collection('expenses') // Unique collection for expenses
+            .doc(uid)
+            .collection('expenses')
             .add({
-          'initialExpense': '0', // You can add a default expense if needed
+          'initialExpense': '0',
         });
 
-        // Create additional collections like 'reminders' or 'goals' for user-specific data
+        // Initialize user's reminders collection
         await FirebaseFirestore.instance
             .collection('users')
-            .doc(user.uid)
-            .collection('reminders') // Unique collection for reminders
+            .doc(uid)
+            .collection('reminders')
             .add({
-          'reminderMessage': 'Welcome to your personal finance tracker!', // Example reminder
+          'reminderMessage': 'Welcome to your personal finance tracker!',
         });
 
-        log("User created successfully with unique data set.");
-        goToHome(context); // Navigate to the HomeScreen
+        log("User created successfully with UID: $uid");
+        goToHome(context, uid); // Navigate to the HomeScreen
       }
     } on FirebaseAuthException catch (e) {
       setState(() {

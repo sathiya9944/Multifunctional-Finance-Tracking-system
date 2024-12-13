@@ -29,6 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // Method to validate inputs and log in the user
   void _validateAndLogin() async {
     setState(() {
       _emailError = null;
@@ -37,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     bool isValid = true;
 
+    // Email validation
     if (_emailController.text.isEmpty) {
       setState(() {
         _emailError = "Email is required.";
@@ -50,6 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
       isValid = false;
     }
 
+    // Password validation
     if (_passwordController.text.isEmpty) {
       setState(() {
         _passwordError = "Password is required.";
@@ -59,24 +62,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (isValid) {
       try {
+        // Log in the user with email and password
         final user = await _auth.loginUserWithEmailAndPassword(
           _emailController.text,
           _passwordController.text,
         );
 
         if (user != null) {
-          log("User Logged In");
+          log("User Logged In with UID: ${user.uid}"); // Access and log the UID
 
-          // Fetch user's unique data from Firestore after login
+          // Fetch user's unique data from Firestore using UID
           await _fetchUserData(user.uid);
 
-          goToHome(context); // Navigate to Home Page
+          // Navigate to the Home Screen
+          goToHome(context, user.uid); // Pass the user UID as an argument
         } else {
+          // Show error if login fails
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Invalid email or password")),
           );
         }
       } catch (e) {
+        // Handle Firebase errors
         if (e.toString().contains('too-many-requests')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -92,12 +99,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Fetch user-specific data after login
+  // Method to fetch user-specific data using UID
   Future<void> _fetchUserData(String userId) async {
     try {
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(userId)
+          .doc(userId) // Use UID as the document ID
           .get();
 
       if (userDoc.exists) {
@@ -105,25 +112,27 @@ class _LoginScreenState extends State<LoginScreen> {
         var userData = userDoc.data();
         log('User data: $userData');
 
-        // You can now store this data locally, pass it to the HomeScreen, or display it
-        // For example, you could initialize user-related data (like profile info or expenses)
+        // Perform actions with the user data
+        // For example, store the data locally or initialize user-specific features
       } else {
-        log('User data not found');
+        log('User data not found for UID: $userId');
       }
     } catch (e) {
-      log('Error fetching user data: $e');
+      log('Error fetching user data for UID $userId: $e');
     }
   }
 
-  void goToHome(BuildContext context) {
+  // Navigate to Home Screen
+  void goToHome(BuildContext context, String uid) {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => const HomeScreen(),
+        builder: (context) => HomeScreen(uid: uid),
       ),
     );
   }
 
+  // Navigate to Signup Screen
   void goToSignup(BuildContext context) {
     Navigator.push(
       context,

@@ -1,76 +1,72 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart'; // For generating unique group IDs
-import 'package:url_launcher/url_launcher.dart'; // For opening email with link
-import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore package
+import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'group_details_page.dart';
 
 class GroupFinanceTracker extends StatefulWidget {
+  final String currentUserId;
+
+  const GroupFinanceTracker({required this.currentUserId});
+
   @override
   _GroupFinanceTrackerState createState() => _GroupFinanceTrackerState();
 }
 
 class _GroupFinanceTrackerState extends State<GroupFinanceTracker> {
   final TextEditingController _groupNameController = TextEditingController();
+  final TextEditingController _budgetController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Function to create a new group with budget
   void _createGroup() {
-    if (_groupNameController.text.isNotEmpty) {
-      final groupId = const Uuid().v4(); // Generate unique group ID
-      final budgetController = TextEditingController();
+    if (_groupNameController.text.isNotEmpty &&
+        _budgetController.text.isNotEmpty) {
+      final groupId = const Uuid().v4();
+      final budget = double.tryParse(_budgetController.text);
 
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Set Group Budget'),
-            content: TextField(
-              controller: budgetController,
-              decoration: const InputDecoration(
-                labelText: 'Budget',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
+      if (budget != null) {
+        _firestore.collection('groups').doc(groupId).set({
+          'id': groupId,
+          'name': _groupNameController.text,
+          'members': [
+            {'uid': widget.currentUserId}
+          ],
+          'expenses': [],
+          'budget': budget,
+          'link': 'https://example.com/join/$groupId',
+          'creator': widget.currentUserId,
+        }).then((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Group "${_groupNameController.text}" created!'),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  final budget = double.tryParse(budgetController.text);
-                  if (budget != null) {
-                    // Create the new group in Firestore
-                    _firestore.collection('groups').doc(groupId).set({
-                      'id': groupId,
-                      'name': _groupNameController.text,
-                      'members': [], // Initial empty members list
-                      'expenses': [], // Initial empty expenses list
-                      'budget': budget, // Set the initial budget
-                      'link':
-                          'https://example.com/join/$groupId', // Example group link
-                    }).then((_) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text(
-                                'Group "${_groupNameController.text}" created!')),
-                      );
-                      _groupNameController.clear();
-                      Navigator.pop(context);
-                    });
-                  }
-                },
-                child: const Text('Create'),
-              ),
-            ],
           );
-        },
-      );
+          _groupNameController.clear();
+          _budgetController.clear();
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GroupDetailsPage(groupId: groupId),
+            ),
+          );
+        });
+      }
     }
   }
 
-  // Function to send email invite
+  Stream<List<Map<String, dynamic>>> _fetchGroups() {
+    return _firestore
+        .collection('groups')
+        .where('members', arrayContains: {'uid': widget.currentUserId})
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            return doc.data() as Map<String, dynamic>;
+          }).toList();
+        });
+  }
+
   void _sendInvite(String groupLink) async {
     final emailUri = Uri(
       scheme: 'mailto',
@@ -81,28 +77,20 @@ class _GroupFinanceTrackerState extends State<GroupFinanceTracker> {
       },
     );
 
-    if (await canLaunch(emailUri.toString())) {
-      await launch(emailUri.toString());
+    if (await canLaunchUrl(emailUri)) {
+      await launchUrl(emailUri);
     } else {
-      throw 'Could not send email';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not send email')),
+      );
     }
   }
 
-  // Fetch all groups from Firestore
-  Future<List<Map<String, dynamic>>> _fetchGroups() async {
-    QuerySnapshot snapshot = await _firestore.collection('groups').get();
-    return snapshot.docs.map((doc) {
-      return doc.data() as Map<String, dynamic>;
-    }).toList();
-  }
-
-  // Navigate to group details
   void _openGroupDetails(Map<String, dynamic> group) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GroupDetailsPage(
-            groupId: group['id']), // Pass groupId to GroupDetailsPage
+        builder: (context) => GroupDetailsPage(groupId: group['id']),
       ),
     );
   }
@@ -114,8 +102,8 @@ class _GroupFinanceTrackerState extends State<GroupFinanceTracker> {
         title: const Text('Group Finance Tracker'),
         backgroundColor: const Color(0xFF6200EA),
       ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _fetchGroups(), // Fetch groups from Firestore
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _fetchGroups(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -137,11 +125,9 @@ class _GroupFinanceTrackerState extends State<GroupFinanceTracker> {
               itemCount: groups.length,
               itemBuilder: (context, index) {
                 final group = groups[index];
-                final groupName =
-                    group['name'] ?? 'No Name'; // Handle null group name
-                final membersCount =
-                    group['members']?.length ?? 0; // Handle null members
-                final groupLink = group['link'] ?? ''; // Handle null link
+                final groupName = group['name'] ?? 'No Name';
+                final membersCount = group['members']?.length ?? 0;
+                final groupLink = group['link'] ?? '';
 
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 10),
@@ -152,8 +138,7 @@ class _GroupFinanceTrackerState extends State<GroupFinanceTracker> {
                       icon: const Icon(Icons.group_add),
                       onPressed: () {
                         if (groupLink.isNotEmpty) {
-                          _sendInvite(
-                              groupLink); // Send invite when button pressed
+                          _sendInvite(groupLink);
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Group link is missing')),
@@ -161,8 +146,7 @@ class _GroupFinanceTrackerState extends State<GroupFinanceTracker> {
                         }
                       },
                     ),
-                    onTap: () => _openGroupDetails(
-                        group), // Navigate to group details page
+                    onTap: () => _openGroupDetails(group),
                   ),
                 );
               },
@@ -178,19 +162,32 @@ class _GroupFinanceTrackerState extends State<GroupFinanceTracker> {
     );
   }
 
-  // Open the group creation dialog
   void _openGroupCreationDialog() {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Create New Group'),
-          content: TextField(
-            controller: _groupNameController,
-            decoration: const InputDecoration(
-              labelText: 'Group Name',
-              border: OutlineInputBorder(),
-            ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _groupNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Group Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: _budgetController,
+                decoration: const InputDecoration(
+                  labelText: 'Group Budget',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
           ),
           actions: [
             TextButton(
