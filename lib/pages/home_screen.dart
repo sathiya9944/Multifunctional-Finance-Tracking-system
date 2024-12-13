@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'individual_expenses_screen.dart';
 import 'group_expenses_screen.dart';
 import 'reminders_screen.dart';
+import 'package:finance_tracker/auth/login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String uid; // Add uid parameter
+
+  const HomeScreen({super.key, required this.uid}); // Require uid
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -13,12 +16,28 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  // List of screens to navigate to
-  final List<Widget> _screens = [
-    FirestoreCRUD(),
-    GroupFinanceTracker(),
-    Reminders(),
-  ];
+  late final List<Widget> _screens;
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   // Pass uid to the child screens
+  //   _screens = [
+  //     FirestoreCRUD(uid: widget.uid),
+  //     GroupFinanceTracker(uid: widget.uid),
+  //     Reminders(uid: widget.uid),
+  //   ];
+  // }
+  @override
+  void initState() {
+    super.initState();
+    // Pass uid to the child screens
+    _screens = [
+      FirestoreCRUD(uid: widget.uid),
+      GroupFinanceTracker(currentUserId: widget.uid), // Pass uid here
+      Reminders(uid: widget.uid), // Pass uid here
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,9 +46,15 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          if (index == _screens.length) {
+            // Navigate to the login screen (Logout)
+            Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => const LoginScreen()));
+          } else {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
         },
         items: const [
           BottomNavigationBarItem(
@@ -44,10 +69,14 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.alarm),
             label: "Reminder",
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.logout),
+            label: "Logout",
+          ),
         ],
         backgroundColor: const Color.fromARGB(
-            255, 247, 246, 249), // background for bottom bar
-        selectedItemColor: const Color(0xFF6200EA), // selected icon color
+            255, 247, 246, 249), // Background color for bottom bar
+        selectedItemColor: const Color(0xFF6200EA), // Selected icon color
         unselectedItemColor: Colors.black54, // Dark color for unselected items
       ),
     );

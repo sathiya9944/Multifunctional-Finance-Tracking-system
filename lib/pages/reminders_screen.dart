@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; // For date and currency formatting
 
 class Reminders extends StatefulWidget {
-  const Reminders({super.key});
+  final String uid; // User's UID
+
+  const Reminders({Key? key, required this.uid}) : super(key: key);
 
   @override
   State<Reminders> createState() => _RemindersState();
@@ -17,10 +20,13 @@ class _RemindersState extends State<Reminders> {
       TextEditingController();
   DateTime? _selectedDate;
   List<Map<String, dynamic>> _reminders = [];
+  String? userId; // Add userId
 
   @override
   void initState() {
     super.initState();
+    userId =
+        widget.uid; // Assign userId with the UID passed from Reminders widget
     flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
     var initializationSettingsAndroid =
         const AndroidInitializationSettings('app_icon');
@@ -32,8 +38,10 @@ class _RemindersState extends State<Reminders> {
 
   // Load and sort reminders, and delete expired ones
   Future<void> _loadReminders() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('reminders').get();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('reminders')
+        .where('uid', isEqualTo: userId) // Filter by user's UID
+        .get();
 
     List<Map<String, dynamic>> reminders = snapshot.docs.map((doc) {
       return {
@@ -99,6 +107,7 @@ class _RemindersState extends State<Reminders> {
         'title': reminderTitle,
         'amount': reminderAmount,
         'date': _selectedDate,
+        'uid': userId, // Add user's UID here
       };
 
       if (id == null) {
@@ -231,6 +240,13 @@ class _RemindersState extends State<Reminders> {
           itemBuilder: (context, index) {
             final reminder = _reminders[index];
             final reminderDate = (reminder['date'] as Timestamp).toDate();
+
+            // Format date and amount
+            String formattedDate =
+                DateFormat('MM/dd/yyyy').format(reminderDate);
+            String formattedAmount = NumberFormat.currency(symbol: '\$')
+                .format(double.parse(reminder['amount']));
+
             return Card(
               margin: const EdgeInsets.symmetric(vertical: 8),
               elevation: 4,
@@ -244,8 +260,7 @@ class _RemindersState extends State<Reminders> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  'Amount: ${reminder['amount']}\nDate: ${reminderDate.toLocal()}'
-                      .split(' ')[0],
+                  'Amount: $formattedAmount\nDate: $formattedDate',
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -269,7 +284,7 @@ class _RemindersState extends State<Reminders> {
         onPressed: () {
           _showAddReminderDialog(context, false, null);
         },
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add),
         backgroundColor: const Color(0xFF6200EA),
       ),
     );

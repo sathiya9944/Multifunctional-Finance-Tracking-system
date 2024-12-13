@@ -2,29 +2,36 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class FirestoreCRUD extends StatefulWidget {
-  const FirestoreCRUD({super.key});
+  final String uid; // Accept UID as a parameter
+
+  const FirestoreCRUD({Key? key, required this.uid}) : super(key: key);
 
   @override
   State<FirestoreCRUD> createState() => _FirestoreCRUDState();
 }
 
-final CollectionReference expensesCollection =
-    FirebaseFirestore.instance.collection("expenses");
-
 class _FirestoreCRUDState extends State<FirestoreCRUD> {
+  late CollectionReference userCollection;
+
   double balance = 0.0;
   double totalIncome = 0.0;
   double totalExpense = 0.0;
+  String searchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    userCollection = FirebaseFirestore.instance
+        .collection("users")
+        .doc(widget.uid)
+        .collection("expenses");
     _getBalance();
   }
 
-  // Method to fetch balance, total income, and total expenses
+  // Fetch balance, total income, and total expenses
   void _getBalance() async {
-    final QuerySnapshot snapshot = await expensesCollection.get();
+    final QuerySnapshot snapshot = await userCollection.get();
+
     double income = 0.0;
     double expenses = 0.0;
 
@@ -42,6 +49,14 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
       totalExpense = expenses;
       balance = income - expenses;
     });
+  }
+
+  // Fetch filtered expenses based on search query
+  Stream<QuerySnapshot> _getFilteredExpenses() {
+    return userCollection
+        .where('name', isGreaterThanOrEqualTo: searchQuery)
+        .where('name', isLessThanOrEqualTo: searchQuery + '\uf8ff')
+        .snapshots();
   }
 
   @override
@@ -140,9 +155,25 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
               ),
             ),
             const SizedBox(height: 20),
+            TextField(
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                labelText: 'Search expenses...',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: expensesCollection.snapshots(),
+                stream: _getFilteredExpenses(),
                 builder: (BuildContext context,
                     AsyncSnapshot<QuerySnapshot> snapshot) {
                   if (snapshot.hasError) {
@@ -237,7 +268,7 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
                                   child: ListTile(
                                     onTap: () {
                                       Navigator.pop(context); // Close menu
-                                      expensesCollection
+                                      userCollection
                                           .doc(document.id)
                                           .delete()
                                           .then((_) {
@@ -287,76 +318,73 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
         borderRadius: BorderRadius.circular(15),
       ),
       builder: (BuildContext ctx) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Edit Expense',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF6200EA),
+                    ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Expense Name'),
+              ),
+              const SizedBox(height: 20),
+              Row(
                 children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Name',
-                      labelStyle: TextStyle(
-                        color: Theme.of(context).primaryColor, // Primary color
-                      ),
+                  Expanded(
+                    child: TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Amount'),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: amountController,
-                    decoration: InputDecoration(
-                      labelText: 'Amount',
-                      labelStyle: TextStyle(
-                        color: Theme.of(context).primaryColor, // Primary color
-                      ),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(width: 16),
                   DropdownButton<String>(
                     value: selectedType,
-                    dropdownColor: Theme.of(context).primaryColorLight,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'Expense', child: Text('Expense')),
-                      DropdownMenuItem(value: 'Income', child: Text('Income')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setModalState(() {
-                          selectedType = value;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      expensesCollection.doc(id).update({
-                        'name': nameController.text.trim(),
-                        'amount':
-                            double.tryParse(amountController.text.trim()) ??
-                                0.0,
-                        'type': selectedType,
-                      }).then((_) {
-                        _getBalance();
-                        Navigator.pop(ctx);
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedType = newValue!;
                       });
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                    ),
-                    child: const Text(
-                      'Update',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    items: <String>['Income', 'Expense']
+                        .map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
                   ),
                 ],
               ),
-            );
-          },
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  if (nameController.text.isNotEmpty &&
+                      amountController.text.isNotEmpty) {
+                    final Map<String, dynamic> expenseData = {
+                      'name': nameController.text,
+                      'amount': double.tryParse(amountController.text) ?? 0.0,
+                      'type': selectedType,
+                      'timestamp': Timestamp.now(),
+                    };
+
+                    userCollection.doc(id).update(expenseData).then((_) {
+                      Navigator.pop(context);
+                      _getBalance();
+                    });
+                  }
+                },
+                child: const Text('Save Changes'),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -373,76 +401,73 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
         borderRadius: BorderRadius.circular(15),
       ),
       builder: (BuildContext ctx) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Add Expense',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF6200EA),
+                    ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Expense Name'),
+              ),
+              const SizedBox(height: 20),
+              Row(
                 children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Name',
-                      labelStyle: TextStyle(
-                        color: Theme.of(context).primaryColor, // Primary color
-                      ),
+                  Expanded(
+                    child: TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Amount'),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: amountController,
-                    decoration: InputDecoration(
-                      labelText: 'Amount',
-                      labelStyle: TextStyle(
-                        color: Theme.of(context).primaryColor, // Primary color
-                      ),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(width: 16),
                   DropdownButton<String>(
                     value: selectedType,
-                    dropdownColor: const Color.fromARGB(255, 232, 224, 245),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'Expense', child: Text('Expense')),
-                      DropdownMenuItem(value: 'Income', child: Text('Income')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setModalState(() {
-                          selectedType = value;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      expensesCollection.add({
-                        'name': nameController.text.trim(),
-                        'amount':
-                            double.tryParse(amountController.text.trim()) ??
-                                0.0,
-                        'type': selectedType,
-                      }).then((_) {
-                        _getBalance();
-                        Navigator.pop(ctx);
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedType = newValue!;
                       });
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                    ),
-                    child: const Text(
-                      'Add',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    items: <String>['Income', 'Expense']
+                        .map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
                   ),
                 ],
               ),
-            );
-          },
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  if (nameController.text.isNotEmpty &&
+                      amountController.text.isNotEmpty) {
+                    final Map<String, dynamic> expenseData = {
+                      'name': nameController.text,
+                      'amount': double.tryParse(amountController.text) ?? 0.0,
+                      'type': selectedType,
+                      'timestamp': Timestamp.now(),
+                    };
+
+                    userCollection.add(expenseData).then((_) {
+                      Navigator.pop(context);
+                      _getBalance();
+                    });
+                  }
+                },
+                child: const Text('Add Expense'),
+              ),
+            ],
+          ),
         );
       },
     );
