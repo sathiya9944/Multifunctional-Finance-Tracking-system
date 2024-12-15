@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // Import the intl package for DateFormat
 
 class FirestoreCRUD extends StatefulWidget {
   final String uid; // Accept UID as a parameter
@@ -225,10 +226,21 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
                                   color: Colors.black87,
                                   fontWeight: FontWeight.w600),
                             ),
-                            subtitle: Text(
-                              '₹${data['amount']?.toString() ?? '0'}',
-                              style: theme.textTheme.bodyMedium
-                                  ?.copyWith(color: Colors.black54),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '₹${data['amount']?.toString() ?? '0'}',
+                                  style: theme.textTheme.bodyMedium
+                                      ?.copyWith(color: Colors.black54),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Date: ${DateFormat.yMMMd().format((data['timestamp'] as Timestamp).toDate())}',
+                                  style: theme.textTheme.bodySmall
+                                      ?.copyWith(color: Colors.black54),
+                                ),
+                              ],
                             ),
                             leading: CircleAvatar(
                               backgroundColor:
@@ -246,7 +258,8 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
                                   value: 1,
                                   child: ListTile(
                                     onTap: () {
-                                      Navigator.pop(context);
+                                      Navigator.pop(
+                                          context); // Close the dialog
                                       updateBottomSheet(
                                         context,
                                         document.id,
@@ -267,7 +280,8 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
                                   value: 2,
                                   child: ListTile(
                                     onTap: () {
-                                      Navigator.pop(context); // Close menu
+                                      Navigator.pop(
+                                          context); // Close the dialog
                                       userCollection
                                           .doc(document.id)
                                           .delete()
@@ -287,6 +301,9 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
                             ),
                           ),
                         ),
+                        onTap: () {
+                          // Handle tap event if needed
+                        },
                       );
                     }).toList(),
                   );
@@ -297,174 +314,135 @@ class _FirestoreCRUDState extends State<FirestoreCRUD> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => createBottomSheet(context),
-        backgroundColor: const Color(0xFF6200EA), // Purple FAB
+        onPressed: () {
+          _showExpenseDialog(context);
+        },
         child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: const Color(0xFF6200EA), // Original purple color
       ),
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.endFloat, // Move to the right
     );
   }
 
-  void updateBottomSheet(BuildContext context, String id, String name,
-      String type, String amount) {
+  // Show the dialog to add/edit expenses
+  Future<void> _showExpenseDialog(BuildContext context,
+      {String id = '',
+      String name = '',
+      String type = 'Expense',
+      String amount = ''}) async {
     final TextEditingController nameController =
         TextEditingController(text: name);
     final TextEditingController amountController =
         TextEditingController(text: amount);
-    String selectedType = type;
 
-    showModalBottomSheet(
+    return showDialog<void>(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      builder: (BuildContext ctx) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-          child: Column(
+      barrierDismissible: false, // Prevent dismissing by clicking outside
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(id.isEmpty ? 'Add Expense' : 'Edit Expense'),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Edit Expense',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF6200EA),
-                    ),
-              ),
-              const SizedBox(height: 20),
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Expense Name'),
+                decoration: const InputDecoration(
+                  hintText: 'Expense Name',
+                ),
               ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Amount'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  DropdownButton<String>(
-                    value: selectedType,
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        selectedType = newValue!;
-                      });
-                    },
-                    items: <String>['Income', 'Expense']
-                        .map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  if (nameController.text.isNotEmpty &&
-                      amountController.text.isNotEmpty) {
-                    final Map<String, dynamic> expenseData = {
-                      'name': nameController.text,
-                      'amount': double.tryParse(amountController.text) ?? 0.0,
-                      'type': selectedType,
-                      'timestamp': Timestamp.now(),
-                    };
-
-                    userCollection.doc(id).update(expenseData).then((_) {
-                      Navigator.pop(context);
-                      _getBalance();
-                    });
-                  }
-                },
-                child: const Text('Save Changes'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                decoration: const InputDecoration(
+                  hintText: 'Amount',
+                  prefixText: '₹ ',
+                ),
+                keyboardType: TextInputType.number,
               ),
             ],
           ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.isNotEmpty &&
+                    amountController.text.isNotEmpty) {
+                  final double amountValue =
+                      double.parse(amountController.text);
+
+                  if (id.isEmpty) {
+                    // Add new expense
+                    userCollection.add({
+                      'name': nameController.text,
+                      'type': type,
+                      'amount': amountValue,
+                      'timestamp': Timestamp.now(),
+                    }).then((value) {
+                      _getBalance(); // Update balance after adding
+                      Navigator.of(context).pop();
+                    });
+                  } else {
+                    // Update existing expense
+                    userCollection.doc(id).update({
+                      'name': nameController.text,
+                      'amount': amountValue,
+                    }).then((value) {
+                      _getBalance(); // Update balance after editing
+                      Navigator.of(context).pop();
+                    });
+                  }
+                }
+              },
+              child: Text(id.isEmpty ? 'Add' : 'Save'),
+            ),
+          ],
         );
       },
     );
   }
 
-  void createBottomSheet(BuildContext context) {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController amountController = TextEditingController();
-    String selectedType = 'Expense';
-
+  // Show bottom sheet for editing expenses
+  void updateBottomSheet(
+    BuildContext context,
+    String id,
+    String name,
+    String type,
+    String amount,
+  ) {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      builder: (BuildContext ctx) {
+      builder: (BuildContext context) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Add Expense',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF6200EA),
-                    ),
-              ),
-              const SizedBox(height: 20),
               TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Expense Name'),
+                controller: TextEditingController(text: name),
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                ),
               ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Amount'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  DropdownButton<String>(
-                    value: selectedType,
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        selectedType = newValue!;
-                      });
-                    },
-                    items: <String>['Income', 'Expense']
-                        .map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                  ),
-                ],
+              TextField(
+                controller: TextEditingController(text: amount),
+                decoration: const InputDecoration(
+                  labelText: 'Amount',
+                  prefixText: '₹ ',
+                ),
+                keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  if (nameController.text.isNotEmpty &&
-                      amountController.text.isNotEmpty) {
-                    final Map<String, dynamic> expenseData = {
-                      'name': nameController.text,
-                      'amount': double.tryParse(amountController.text) ?? 0.0,
-                      'type': selectedType,
-                      'timestamp': Timestamp.now(),
-                    };
-
-                    userCollection.add(expenseData).then((_) {
-                      Navigator.pop(context);
-                      _getBalance();
-                    });
-                  }
+                  // Add your update logic here
+                  Navigator.pop(context);
                 },
-                child: const Text('Add Expense'),
+                child: const Text('Update'),
               ),
             ],
           ),

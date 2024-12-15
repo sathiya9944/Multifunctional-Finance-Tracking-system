@@ -96,7 +96,6 @@ class _SignupScreenState extends State<SignupScreen> {
         MaterialPageRoute(builder: (context) => HomeScreen(uid: uid)),
       );
 
-
   Future<void> _signup() async {
     setState(() {
       _errorMessage = null;
@@ -105,6 +104,15 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_email.text.isEmpty || _password.text.isEmpty || _name.text.isEmpty) {
       setState(() {
         _errorMessage = "All fields are required.";
+      });
+      return;
+    }
+
+    // Password validation
+    if (!_isPasswordValid(_password.text)) {
+      setState(() {
+        _errorMessage =
+            "Password must be at least 8 characters long, contain one special character, one numeric character, and one uppercase letter.";
       });
       return;
     }
@@ -173,5 +181,12 @@ class _SignupScreenState extends State<SignupScreen> {
         _errorMessage = "An unexpected error occurred.";
       });
     }
+  }
+
+  bool _isPasswordValid(String password) {
+    final hasSpecialChar = RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
+    final hasNumeric = RegExp(r'\d').hasMatch(password);
+    final hasUpperCase = RegExp(r'[A-Z]').hasMatch(password);
+    return password.length > 7 && hasSpecialChar && hasNumeric && hasUpperCase;
   }
 }
