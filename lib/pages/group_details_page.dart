@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart'; // For generating unique expense IDs
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore package
@@ -21,23 +22,32 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Function to add a new expense
-  void _addExpense() {
-    if (_expenseNameController.text.isNotEmpty &&
+  void _addExpense() async {
+    final user =
+        FirebaseAuth.instance.currentUser; // Get the currently logged-in user
+    if (user != null &&
+        _expenseNameController.text.isNotEmpty &&
         _amountController.text.isNotEmpty) {
       final expenseId = const Uuid().v4();
       final expenseName = _expenseNameController.text;
       final amount = double.tryParse(_amountController.text);
 
       if (amount != null) {
+        // Fetch user name from Firestore Users collection
+        final userDoc =
+            await _firestore.collection('Users').doc(user.uid).get();
+        final userName = userDoc.data()?['name'] ??
+            'Unknown'; // Default to 'Unknown' if not found
+
+        final expenseData = {
+          'id': expenseId,
+          'name': expenseName,
+          'amount': amount,
+          'spentBy': [user.uid], // Include the current user's UID
+        };
+
         _firestore.collection('groups').doc(widget.groupId).update({
-          'expenses': FieldValue.arrayUnion([
-            {
-              'id': expenseId,
-              'name': expenseName,
-              'amount': amount,
-              'spentBy': [],
-            }
-          ])
+          'expenses': FieldValue.arrayUnion([expenseData])
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -88,7 +98,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   }
 
   // Function to update the edited expense
-  void _updateExpense() {
+  void _updateExpense() async {
     if (_selectedExpenseId != null &&
         _expenseNameController.text.isNotEmpty &&
         _amountController.text.isNotEmpty) {
@@ -96,41 +106,51 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       final updatedAmount = double.tryParse(_amountController.text);
 
       if (updatedAmount != null) {
-        _firestore.collection('groups').doc(widget.groupId).update({
-          'expenses': FieldValue.arrayRemove([
-            {
+        final groupDoc =
+            await _firestore.collection('groups').doc(widget.groupId).get();
+        if (groupDoc.exists) {
+          final groupData = groupDoc.data() as Map<String, dynamic>;
+          final expenses =
+              List<Map<String, dynamic>>.from(groupData['expenses']);
+
+          // Find the index of the expense to update
+          final expenseIndex = expenses
+              .indexWhere((expense) => expense['id'] == _selectedExpenseId);
+
+          if (expenseIndex != -1) {
+            // Update the specific expense
+            expenses[expenseIndex] = {
               'id': _selectedExpenseId,
-              'name': _editedExpenseName,
-              'amount': _editedAmount,
-              'spentBy': [],
-            }
-          ])
-        }).then((_) {
-          _firestore.collection('groups').doc(widget.groupId).update({
-            'expenses': FieldValue.arrayUnion([
-              {
-                'id': _selectedExpenseId,
-                'name': updatedExpenseName,
-                'amount': updatedAmount,
-                'spentBy': [],
-              }
-            ])
-          });
+              'name': updatedExpenseName,
+              'amount': updatedAmount,
+              'spentBy': expenses[expenseIndex]
+                  ['spentBy'], // Keep the original spentBy
+            };
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Expense updated!')),
-          );
+            // Update the group document with the modified expenses array
+            await _firestore.collection('groups').doc(widget.groupId).update({
+              'expenses': expenses,
+            });
 
-          setState(() {
-            _selectedExpenseId = null;
-            _editedExpenseName = null;
-            _editedAmount = null;
-          });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Expense updated!')),
+            );
 
-          _expenseNameController.clear();
-          _amountController.clear();
-          Navigator.pop(context);
-        });
+            setState(() {
+              _selectedExpenseId = null;
+              _editedExpenseName = null;
+              _editedAmount = null;
+            });
+
+            _expenseNameController.clear();
+            _amountController.clear();
+            Navigator.pop(context);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Expense not found!')),
+            );
+          }
+        }
       }
     }
   }
@@ -141,7 +161,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(isEditMode ? 'Edit Expense' : 'Add Expense'),
+          title: Text(
+            isEditMode ? 'Edit Expense' : 'Add Expense',
+            style: TextStyle(color: Colors.white), // Set the color here
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -186,6 +209,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             appBar: AppBar(
+              leading: BackButton(),
               title: Text('Loading Group Details...'),
             ),
             body: Center(child: CircularProgressIndicator()),
@@ -195,6 +219,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Scaffold(
             appBar: AppBar(
+              leading: BackButton(),
               title: Text('Error'),
             ),
             body: Center(child: Text('Failed to load group data')),
@@ -207,7 +232,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('${groupData['name']} - Group Details'),
+            leading: BackButton(),
+            title: Text(
+              '${groupData['name']} - Group Details',
+              style: TextStyle(color: Colors.white), // Set the text color here
+            ),
             backgroundColor: const Color(0xFF6200EA),
           ),
           body: Padding(
@@ -238,7 +267,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                           ),
                           SizedBox(height: 10),
                           Text(
-                            '\$${groupData['budget'].toStringAsFixed(2)}',
+                            '₹${groupData['budget'].toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.bold,
@@ -247,14 +276,21 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                           ),
                           SizedBox(height: 20),
                           Text(
-                            'Total Expenses: \$${totalExpense.toStringAsFixed(2)}',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            'Remaining Budget: \$${remainingBudget.toStringAsFixed(2)}',
+                            'Total Expenses: ₹${totalExpense.toStringAsFixed(2)}',
                             style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
+                              fontSize: 18,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          SizedBox(height: 5),
+                          Text(
+                            'Remaining Budget: ₹${remainingBudget.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: remainingBudget < 0
+                                  ? Colors.red
+                                  : Colors.green,
+                            ),
                           ),
                         ],
                       ),
@@ -262,29 +298,24 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                   ),
                 ),
 
-                // List of Expenses
-                Text(
-                  'Expenses:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 10),
+                SizedBox(height: 20),
                 Expanded(
                   child: ListView.builder(
                     itemCount: groupData['expenses'].length,
                     itemBuilder: (context, index) {
                       final expense = groupData['expenses'][index];
                       return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 10),
+                        margin: const EdgeInsets.symmetric(vertical: 8),
                         child: ListTile(
                           title: Text(expense['name']),
                           subtitle: Text(
-                              'Amount: \$${expense['amount'].toStringAsFixed(2)}'),
-                          trailing: IconButton(
-                            icon: Icon(Icons.edit),
-                            onPressed: () {
-                              _editExpense(expense['id'], expense['name'],
-                                  expense['amount']);
-                            },
+                              'Spent by: ${expense['spentBy'].join(', ')}'),
+                          trailing:
+                              Text('₹${expense['amount'].toStringAsFixed(2)}'),
+                          onTap: () => _editExpense(
+                            expense['id'],
+                            expense['name'],
+                            expense['amount'].toDouble(),
                           ),
                         ),
                       );
@@ -308,7 +339,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             onTap: (index) {
               if (index == 0) {
                 _navigateToExpenseSharing(groupData);
-              } else {
+              } else if (index == 1) {
                 _showExpenseDialog(false);
               }
             },

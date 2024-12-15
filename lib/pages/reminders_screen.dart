@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -171,6 +173,7 @@ class _RemindersState extends State<Reminders> {
                 controller: _reminderAmountController,
                 decoration: const InputDecoration(
                   labelText: 'Amount',
+                  prefixText: '₹',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -206,8 +209,8 @@ class _RemindersState extends State<Reminders> {
   Future<void> _pickDate() async {
     DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
+      initialDate: DateTime.now(), // Set initial date to today's date
+      firstDate: DateTime.now(), // First date is today's date
       lastDate: DateTime(2100),
     );
     if (pickedDate != null && pickedDate != _selectedDate) {
@@ -230,62 +233,34 @@ class _RemindersState extends State<Reminders> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Set Reminder'),
+        title: const Text('Reminders', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF6200EA),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView.builder(
-          itemCount: _reminders.length,
-          itemBuilder: (context, index) {
-            final reminder = _reminders[index];
-            final reminderDate = (reminder['date'] as Timestamp).toDate();
-
-            // Format date and amount
-            String formattedDate =
-                DateFormat('MM/dd/yyyy').format(reminderDate);
-            String formattedAmount = NumberFormat.currency(symbol: '\$')
-                .format(double.parse(reminder['amount']));
-
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      body: ListView.builder(
+        itemCount: _reminders.length,
+        itemBuilder: (context, index) {
+          final reminder = _reminders[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            elevation: 5,
+            child: ListTile(
+              title: Text(reminder['title']),
+              subtitle: Text(
+                  'Amount: ${NumberFormat.currency(symbol: '₹').format(int.parse(reminder['amount']))}\nDate: ${DateFormat.yMMMd().format((reminder['date'] as Timestamp).toDate())}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () => _editReminder(index),
               ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                title: Text(
-                  reminder['title'],
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(
-                  'Amount: $formattedAmount\nDate: $formattedDate',
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () => _editReminder(index),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteReminder(reminder['id']),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
+              onLongPress: () => _deleteReminder(reminder['id']),
+            ),
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddReminderDialog(context, false, null);
-        },
-        child: const Icon(Icons.add),
-        backgroundColor: const Color(0xFF6200EA),
+        onPressed: () => _showAddReminderDialog(context, false, null),
+        backgroundColor:
+            const Color(0xFF6200EA), // Set the button background color
+        child: const Icon(Icons.add, color: Colors.white), // Set the icon color
       ),
     );
   }
