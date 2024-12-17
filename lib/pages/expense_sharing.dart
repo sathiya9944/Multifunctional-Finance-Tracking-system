@@ -11,6 +11,7 @@
 
 // // // class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
 // // //   late DocumentReference groupRef;
+// // //   Map<String, String> memberNames = {}; // Cache for UID-to-Name mapping
 
 // // //   @override
 // // //   void initState() {
@@ -19,193 +20,38 @@
 // // //         FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
 // // //   }
 
-// // //   void _updateMemberShare(Map<String, dynamic> expense,
-// // //       Map<String, dynamic> member, double newPercent) {
-// // //     final totalAmount = expense['amount'] ?? 0.0;
+// // //   Future<void> _fetchMemberNames(List members) async {
+// // //     final usersCollection = FirebaseFirestore.instance.collection('users');
 
-// // //     setState(() {
-// // //       member['sharePercent'] = newPercent;
-// // //     });
-
-// // //     // Calculate each member's updated share amount
-// // //     final members = expense['members'] as List<dynamic>?;
-// // //     members?.forEach((m) {
-// // //       m['share'] = totalAmount * (m['sharePercent'] ?? 0) / 100.0;
-// // //     });
-
-// // //     // Calculate remaining amount
-// // //     final remainingAmount =
-// // //         totalAmount - members!.fold(0.0, (sum, m) => sum + (m['share'] ?? 0.0));
-
-// // //     // Update Firestore
-// // //     groupRef.update({
-// // //       'expenses': FieldValue.arrayRemove([expense]),
-// // //     }).then((_) {
-// // //       expense['remainingAmount'] = remainingAmount;
-// // //       groupRef.update({
-// // //         'expenses': FieldValue.arrayUnion([expense]),
-// // //       });
-// // //     });
-// // //   }
-
-// // //   @override
-// // //   Widget build(BuildContext context) {
-// // //     return Scaffold(
-// // //       appBar: AppBar(
-// // //         title: Text('Expense Sharing'),
-// // //         backgroundColor: const Color(0xFF6200EA),
-// // //       ),
-// // //       body: FutureBuilder<DocumentSnapshot>(
-// // //         future: groupRef.get(),
-// // //         builder: (context, snapshot) {
-// // //           if (snapshot.connectionState == ConnectionState.waiting) {
-// // //             return Center(child: CircularProgressIndicator());
+// // //     for (var member in members) {
+// // //       final uid = member['uid'];
+// // //       if (uid != null && !memberNames.containsKey(uid)) {
+// // //         try {
+// // //           // Fetch user document from Firestore
+// // //           final userDoc = await usersCollection.doc(uid).get();
+// // //           if (userDoc.exists) {
+// // //             setState(() {
+// // //               memberNames[uid] = userDoc['name'] ?? 'Unknown';
+// // //             });
+// // //           } else {
+// // //             setState(() {
+// // //               memberNames[uid] = 'Unknown';
+// // //             });
 // // //           }
-
-// // //           if (!snapshot.hasData || snapshot.data!.data() == null) {
-// // //             return Center(child: Text('No data available'));
-// // //           }
-
-// // //           final groupData =
-// // //               snapshot.data!.data() as Map<String, dynamic>? ?? {};
-// // //           final expenses = (groupData['expenses'] as List?) ?? [];
-
-// // //           return Padding(
-// // //             padding: const EdgeInsets.all(16.0),
-// // //             child: Column(
-// // //               crossAxisAlignment: CrossAxisAlignment.start,
-// // //               children: [
-// // //                 Text(
-// // //                   'Shared Expenses:',
-// // //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-// // //                 ),
-// // //                 SizedBox(height: 10),
-// // //                 Expanded(
-// // //                   child: ListView.builder(
-// // //                     itemCount: expenses.length,
-// // //                     itemBuilder: (context, index) {
-// // //                       final expense = expenses[index] as Map<String, dynamic>;
-// // //                       final totalAmount = expense['amount'] ?? 0.0;
-// // //                       final members =
-// // //                           (expense['members'] as List<dynamic>?) ?? [];
-// // //                       final remainingAmount = totalAmount -
-// // //                           members.fold(
-// // //                               0.0, (sum, m) => sum + (m['share'] ?? 0.0));
-
-// // //                       return Card(
-// // //                         margin: const EdgeInsets.symmetric(vertical: 10),
-// // //                         child: Padding(
-// // //                           padding: const EdgeInsets.all(8.0),
-// // //                           child: Column(
-// // //                             crossAxisAlignment: CrossAxisAlignment.start,
-// // //                             children: [
-// // //                               Text(
-// // //                                 'Expense: ${expense['name'] ?? 'Unknown'}',
-// // //                                 style: TextStyle(
-// // //                                     fontSize: 16, fontWeight: FontWeight.bold),
-// // //                               ),
-// // //                               Text(
-// // //                                   'Total Amount: \$${totalAmount.toStringAsFixed(2)}'),
-// // //                               Text(
-// // //                                   'Remaining Amount: \$${remainingAmount.toStringAsFixed(2)}'),
-// // //                               SizedBox(height: 10),
-// // //                               if (members.isNotEmpty)
-// // //                                 ...members.map((member) => Column(
-// // //                                       crossAxisAlignment:
-// // //                                           CrossAxisAlignment.start,
-// // //                                       children: [
-// // //                                         Text(
-// // //                                           '${member['name'] ?? 'Unknown'} - Share Percent: ${(member['sharePercent'] ?? 0).toStringAsFixed(2)}%',
-// // //                                         ),
-// // //                                         Text(
-// // //                                           'Share Amount: \$${(member['share'] ?? 0.0).toStringAsFixed(2)}',
-// // //                                         ),
-// // //                                         TextField(
-// // //                                           decoration: InputDecoration(
-// // //                                               labelText:
-// // //                                                   'Update Share Percent for ${member['name'] ?? 'Unknown'}'),
-// // //                                           keyboardType: TextInputType.number,
-// // //                                           onChanged: (value) {
-// // //                                             final newPercent =
-// // //                                                 double.tryParse(value) ?? 0.0;
-// // //                                             _updateMemberShare(
-// // //                                                 expense, member, newPercent);
-// // //                                           },
-// // //                                         ),
-// // //                                         SizedBox(height: 10),
-// // //                                       ],
-// // //                                     ))
-// // //                               else
-// // //                                 Text('No members for this expense'),
-// // //                             ],
-// // //                           ),
-// // //                         ),
-// // //                       );
-// // //                     },
-// // //                   ),
-// // //                 ),
-// // //               ],
-// // //             ),
-// // //           );
-// // //         },
-// // //       ),
-// // //     );
-// // //   }
-// // // }
-// // // import 'package:flutter/material.dart';
-// // // import 'package:cloud_firestore/cloud_firestore.dart';
-
-// // // class ExpenseSharingPage extends StatefulWidget {
-// // //   final String groupId;
-// // //   ExpenseSharingPage({required this.groupId});
-
-// // //   @override
-// // //   _ExpenseSharingPageState createState() => _ExpenseSharingPageState();
-// // // }
-
-// // // class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
-// // //   late DocumentReference groupRef;
-
-// // //   @override
-// // //   void initState() {
-// // //     super.initState();
-// // //     groupRef =
-// // //         FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
-// // //   }
-
-// // //   void _updateMemberShare(Map<String, dynamic> expense,
-// // //       Map<String, dynamic> member, double newPercent) {
-// // //     final totalAmount = expense['amount'] ?? 0.0;
-
-// // //     setState(() {
-// // //       member['sharePercent'] = newPercent;
-// // //     });
-
-// // //     // Calculate each member's updated share amount
-// // //     final members = expense['members'] as List<dynamic>?;
-// // //     members?.forEach((m) {
-// // //       m['share'] = totalAmount * (m['sharePercent'] ?? 0) / 100.0;
-// // //     });
-
-// // //     // Calculate remaining amount
-// // //     final remainingAmount =
-// // //         totalAmount - members!.fold(0.0, (sum, m) => sum + (m['share'] ?? 0.0));
-
-// // //     // Update Firestore
-// // //     groupRef.update({
-// // //       'expenses': FieldValue.arrayRemove([expense]),
-// // //     }).then((_) {
-// // //       expense['remainingAmount'] = remainingAmount;
-// // //       groupRef.update({
-// // //         'expenses': FieldValue.arrayUnion([expense]),
-// // //       });
-// // //     });
+// // //         } catch (e) {
+// // //           // Handle errors
+// // //           setState(() {
+// // //             memberNames[uid] = 'Error';
+// // //           });
+// // //         }
+// // //       }
+// // //     }
 // // //   }
 
 // // //   double _calculateTotalExpense(List expenses) {
 // // //     double total = 0;
 // // //     for (var expense in expenses) {
-// // //       total += expense['amount'];
+// // //       total += expense['amount'] ?? 0.0;
 // // //     }
 // // //     return total;
 // // //   }
@@ -233,137 +79,159 @@
 // // //           final expenses = (groupData['expenses'] as List?) ?? [];
 // // //           final totalAmount = _calculateTotalExpense(expenses);
 // // //           final members = (groupData['members'] as List?) ?? [];
-// // //           final numberOfMembers = members.length;
 // // //           final budget = groupData['budget'] ?? 0.0;
 // // //           final remainingAmount = budget - totalAmount;
 
-// // //           return Padding(
-// // //             padding: const EdgeInsets.all(16.0),
-// // //             child: Column(
-// // //               crossAxisAlignment: CrossAxisAlignment.start,
-// // //               children: [
-// // //                 Text(
-// // //                   'Group Details:',
-// // //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-// // //                 ),
-// // //                 SizedBox(height: 10),
-// // //                 Text('Total Expense: \$${totalAmount.toStringAsFixed(2)}'),
-// // //                 Text('Number of Members: $numberOfMembers'),
-// // //                 Text('Budget: \$${budget.toStringAsFixed(2)}'),
-// // //                 Text(
-// // //                     'Remaining Budget: \$${remainingAmount.toStringAsFixed(2)}'),
-// // //                 SizedBox(height: 20),
-// // //                 Text(
-// // //                   'Shared Expenses:',
-// // //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-// // //                 ),
-// // //                 SizedBox(height: 10),
-// // //                 Expanded(
-// // //                   child: ListView.builder(
-// // //                     itemCount: expenses.length,
-// // //                     itemBuilder: (context, index) {
-// // //                       final expense = expenses[index] as Map<String, dynamic>;
-// // //                       final totalExpenseAmount = expense['amount'] ?? 0.0;
-// // //                       final members =
-// // //                           (expense['members'] as List<dynamic>?) ?? [];
-// // //                       final remainingAmount = totalExpenseAmount -
-// // //                           members.fold(
-// // //                               0.0, (sum, m) => sum + (m['share'] ?? 0.0));
+// // //           // Fetch member names based on UIDs
+// // //           _fetchMemberNames(members);
 
-// // //                       return Card(
-// // //                         margin: const EdgeInsets.symmetric(vertical: 10),
-// // //                         child: Padding(
-// // //                           padding: const EdgeInsets.all(8.0),
-// // //                           child: Column(
-// // //                             crossAxisAlignment: CrossAxisAlignment.start,
+// // //           return Container(
+// // //             color: const Color(0xFFF2F2F2), // Light gray background
+// // //             child: Padding(
+// // //               padding: const EdgeInsets.all(16.0),
+// // //               child: ListView(
+// // //                 children: [
+// // //                   // Group Details Card
+// // //                   Card(
+// // //                     elevation: 4,
+// // //                     shape: RoundedRectangleBorder(
+// // //                       borderRadius: BorderRadius.circular(12),
+// // //                     ),
+// // //                     margin: const EdgeInsets.only(bottom: 20),
+// // //                     child: Padding(
+// // //                       padding: const EdgeInsets.all(20.0),
+// // //                       child: Column(
+// // //                         crossAxisAlignment: CrossAxisAlignment.start,
+// // //                         children: [
+// // //                           Row(
 // // //                             children: [
+// // //                               Icon(Icons.group,
+// // //                                   color: const Color(0xFF6200EA), size: 28),
+// // //                               SizedBox(width: 10),
 // // //                               Text(
-// // //                                 'Expense: ${expense['name'] ?? 'Unknown'}',
+// // //                                 'Group Details',
 // // //                                 style: TextStyle(
-// // //                                     fontSize: 16, fontWeight: FontWeight.bold),
+// // //                                     fontSize: 20,
+// // //                                     fontWeight: FontWeight.bold,
+// // //                                     color: const Color(0xFF6200EA)),
 // // //                               ),
-// // //                               Text(
-// // //                                   'Total Amount: \$${totalExpenseAmount.toStringAsFixed(2)}'),
-// // //                               Text(
-// // //                                   'Remaining Amount: \$${remainingAmount.toStringAsFixed(2)}'),
-// // //                               SizedBox(height: 10),
-// // //                               if (members.isNotEmpty)
-// // //                                 ...members.map((member) => Column(
-// // //                                       crossAxisAlignment:
-// // //                                           CrossAxisAlignment.start,
-// // //                                       children: [
-// // //                                         Text(
-// // //                                           '${member['name'] ?? 'Unknown'} - Share Percent: ${(member['sharePercent'] ?? 0).toStringAsFixed(2)}%',
-// // //                                         ),
-// // //                                         Text(
-// // //                                           'Share Amount: \$${(member['share'] ?? 0.0).toStringAsFixed(2)}',
-// // //                                         ),
-// // //                                         TextField(
-// // //                                           decoration: InputDecoration(
-// // //                                               labelText:
-// // //                                                   'Update Share Percent for ${member['name'] ?? 'Unknown'}'),
-// // //                                           keyboardType: TextInputType.number,
-// // //                                           onChanged: (value) {
-// // //                                             final newPercent =
-// // //                                                 double.tryParse(value) ?? 0.0;
-// // //                                             _updateMemberShare(
-// // //                                                 expense, member, newPercent);
-// // //                                           },
-// // //                                         ),
-// // //                                         SizedBox(height: 10),
-// // //                                       ],
-// // //                                     ))
-// // //                               else
-// // //                                 Text('No members for this expense'),
 // // //                             ],
 // // //                           ),
-// // //                         ),
-// // //                       );
-// // //                     },
+// // //                           SizedBox(height: 20),
+// // //                           Row(
+// // //                             children: [
+// // //                               Icon(Icons.monetization_on, color: Colors.green),
+// // //                               SizedBox(width: 10),
+// // //                               Text(
+// // //                                 'Total Expense: \$${totalAmount.toStringAsFixed(2)}',
+// // //                                 style: TextStyle(fontSize: 16),
+// // //                               ),
+// // //                             ],
+// // //                           ),
+// // //                           SizedBox(height: 10),
+// // //                           Row(
+// // //                             children: [
+// // //                               Icon(Icons.people, color: Colors.blue),
+// // //                               SizedBox(width: 10),
+// // //                               Text(
+// // //                                 'Number of Members: ${members.length}',
+// // //                                 style: TextStyle(fontSize: 16),
+// // //                               ),
+// // //                             ],
+// // //                           ),
+// // //                           SizedBox(height: 10),
+// // //                           Row(
+// // //                             children: [
+// // //                               Icon(Icons.attach_money, color: Colors.orange),
+// // //                               SizedBox(width: 10),
+// // //                               Text(
+// // //                                 'Budget: \$${budget.toStringAsFixed(2)}',
+// // //                                 style: TextStyle(fontSize: 16),
+// // //                               ),
+// // //                             ],
+// // //                           ),
+// // //                           SizedBox(height: 10),
+// // //                           Row(
+// // //                             children: [
+// // //                               Icon(Icons.savings, color: Colors.red),
+// // //                               SizedBox(width: 10),
+// // //                               Text(
+// // //                                 'Remaining Budget: \$${remainingAmount.toStringAsFixed(2)}',
+// // //                                 style: TextStyle(fontSize: 16),
+// // //                               ),
+// // //                             ],
+// // //                           ),
+// // //                         ],
+// // //                       ),
+// // //                     ),
 // // //                   ),
-// // //                 ),
-// // //               ],
+// // //                   // Members List Card
+// // //                   Card(
+// // //                     elevation: 4,
+// // //                     shape: RoundedRectangleBorder(
+// // //                       borderRadius: BorderRadius.circular(12),
+// // //                     ),
+// // //                     child: Padding(
+// // //                       padding: const EdgeInsets.all(20.0),
+// // //                       child: Column(
+// // //                         crossAxisAlignment: CrossAxisAlignment.start,
+// // //                         children: [
+// // //                           Row(
+// // //                             children: [
+// // //                               Icon(Icons.person, color: Colors.blue, size: 28),
+// // //                               SizedBox(width: 10),
+// // //                               Text(
+// // //                                 'Members',
+// // //                                 style: TextStyle(
+// // //                                   fontSize: 20,
+// // //                                   fontWeight: FontWeight.bold,
+// // //                                   color: Colors.blue,
+// // //                                 ),
+// // //                               ),
+// // //                             ],
+// // //                           ),
+// // //                           SizedBox(height: 20),
+// // //                           ...members.map((member) {
+// // //                             final uid = member['uid'];
+// // //                             final name = memberNames[uid] ?? 'Loading...';
+// // //                             return Padding(
+// // //                               padding:
+// // //                                   const EdgeInsets.symmetric(vertical: 8.0),
+// // //                               child: Row(
+// // //                                 children: [
+// // //                                   Icon(Icons.person_outline,
+// // //                                       color: Colors.grey, size: 24),
+// // //                                   SizedBox(width: 10),
+// // //                                   Column(
+// // //                                     crossAxisAlignment:
+// // //                                         CrossAxisAlignment.start,
+// // //                                     children: [
+// // //                                       Text(
+// // //                                         'Name: $name',
+// // //                                         style: TextStyle(fontSize: 16),
+// // //                                       ),
+// // //                                       Text(
+// // //                                         'UID: ${uid ?? 'N/A'}',
+// // //                                         style: TextStyle(
+// // //                                           fontSize: 14,
+// // //                                           color: Colors.grey[600],
+// // //                                         ),
+// // //                                       ),
+// // //                                     ],
+// // //                                   ),
+// // //                                 ],
+// // //                               ),
+// // //                             );
+// // //                           }).toList(),
+// // //                         ],
+// // //                       ),
+// // //                     ),
+// // //                   ),
+// // //                 ],
+// // //               ),
 // // //             ),
 // // //           );
 // // //         },
-// // //       ),
-// // //       bottomNavigationBar: Padding(
-// // //         padding: const EdgeInsets.all(16.0),
-// // //         child: ElevatedButton(
-// // //           onPressed: () {
-// // //             // Split the bill when button is pressed
-// // //             double totalAmount = 0.0;
-// // //             List<Map<String, dynamic>> members = [];
-// // //             // Calculate total expense and gather member data
-// // //             groupRef.get().then((snapshot) {
-// // //               if (snapshot.exists) {
-// // //                 final data = snapshot.data() as Map<String, dynamic>;
-// // //                 final expenses = data['expenses'] as List<dynamic>;
-// // //                 for (var expense in expenses) {
-// // //                   totalAmount += expense['amount'] ?? 0.0;
-// // //                   members.addAll(expense['members'] ?? []);
-// // //                 }
-// // //               }
-// // //               // Calculate individual split amount
-// // //               final splitAmount = totalAmount / members.length;
-
-// // //               // Update each member's share in Firestore
-// // //               members.forEach((member) {
-// // //                 member['share'] = splitAmount;
-// // //               });
-
-// // //               // Update Firestore with the new split amounts
-// // //               groupRef.update({
-// // //                 'members': members,
-// // //               }).then((_) {
-// // //                 ScaffoldMessenger.of(context).showSnackBar(
-// // //                   SnackBar(content: Text('Expenses split successfully!')),
-// // //                 );
-// // //               });
-// // //             });
-// // //           },
-// // //           child: Text('Split Bill'),
-// // //         ),
 // // //       ),
 // // //     );
 // // //   }
@@ -373,7 +241,6 @@
 
 // // class ExpenseSharingPage extends StatefulWidget {
 // //   final String groupId;
-
 // //   ExpenseSharingPage({required this.groupId});
 
 // //   @override
@@ -382,6 +249,7 @@
 
 // // class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
 // //   late DocumentReference groupRef;
+// //   Map<String, String> memberNames = {}; // Cache for UID-to-Name mapping
 
 // //   @override
 // //   void initState() {
@@ -390,46 +258,61 @@
 // //         FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
 // //   }
 
-// //   /// Updates the share percentage and recalculates share amounts.
-// //   void _updateMemberShare(Map<String, dynamic> expense,
-// //       Map<String, dynamic> member, double newPercent) async {
-// //     final totalAmount = expense['amount'] ?? 0.0;
+// //   Future<void> _fetchMemberNames(List members) async {
+// //     final usersCollection = FirebaseFirestore.instance.collection('users');
 
-// //     setState(() {
-// //       member['sharePercent'] = newPercent;
-// //       member['share'] = (newPercent / 100.0) * totalAmount;
-// //     });
-
-// //     // Update Firestore with the new expense data
-// //     try {
-// //       final updatedMembers =
-// //           List<Map<String, dynamic>>.from(expense['members']);
-// //       final updatedExpense = {...expense, 'members': updatedMembers};
-
-// //       await groupRef.update({
-// //         'expenses': FieldValue.arrayRemove([expense]),
-// //       });
-
-// //       await groupRef.update({
-// //         'expenses': FieldValue.arrayUnion([updatedExpense]),
-// //       });
-
-// //       ScaffoldMessenger.of(context).showSnackBar(
-// //         SnackBar(content: Text('Share updated successfully!')),
-// //       );
-// //     } catch (e) {
-// //       ScaffoldMessenger.of(context).showSnackBar(
-// //         SnackBar(content: Text('Failed to update share: $e')),
-// //       );
+// //     for (var member in members) {
+// //       final uid = member['uid'];
+// //       if (uid != null && !memberNames.containsKey(uid)) {
+// //         try {
+// //           // Fetch user document from Firestore
+// //           final userDoc = await usersCollection.doc(uid).get();
+// //           if (userDoc.exists) {
+// //             setState(() {
+// //               memberNames[uid] = userDoc['name'] ?? 'Unknown';
+// //             });
+// //           } else {
+// //             setState(() {
+// //               memberNames[uid] = 'Unknown';
+// //             });
+// //           }
+// //         } catch (e) {
+// //           // Handle errors
+// //           setState(() {
+// //             memberNames[uid] = 'Error';
+// //           });
+// //         }
+// //       }
 // //     }
 // //   }
 
-// //   /// Calculates the total expense from a list of expenses.
 // //   double _calculateTotalExpense(List expenses) {
-// //     return expenses.fold(
-// //       0.0,
-// //       (total, expense) => total + (expense['amount'] ?? 0.0),
-// //     );
+// //     double total = 0;
+// //     for (var expense in expenses) {
+// //       total += expense['amount'] ?? 0.0;
+// //     }
+// //     return total;
+// //   }
+
+// //   Map<String, double> _calculateMemberContributions(
+// //       List members, List expenses) {
+// //     Map<String, double> contributions = {};
+
+// //     // Initialize contributions to 0 for all members
+// //     for (var member in members) {
+// //       contributions[member['uid']] = 0.0;
+// //     }
+
+// //     // Add up each member's expenses
+// //     for (var expense in expenses) {
+// //       final uid = expense['uid'];
+// //       final amount = expense['amount'] ?? 0.0;
+// //       if (uid != null && contributions.containsKey(uid)) {
+// //         contributions[uid] = (contributions[uid] ?? 0.0) + amount;
+// //       }
+// //     }
+
+// //     return contributions;
 // //   }
 
 // //   @override
@@ -446,148 +329,197 @@
 // //             return Center(child: CircularProgressIndicator());
 // //           }
 
-// //           if (!snapshot.hasData || snapshot.data?.data() == null) {
-// //             return Center(child: Text('No group data available.'));
+// //           if (!snapshot.hasData || snapshot.data!.data() == null) {
+// //             return Center(child: Text('No data available'));
 // //           }
 
-// //           final groupData = snapshot.data!.data() as Map<String, dynamic>;
+// //           final groupData =
+// //               snapshot.data!.data() as Map<String, dynamic>? ?? {};
 // //           final expenses = (groupData['expenses'] as List?) ?? [];
+// //           final totalAmount = _calculateTotalExpense(expenses);
 // //           final members = (groupData['members'] as List?) ?? [];
 // //           final budget = groupData['budget'] ?? 0.0;
-// //           final totalExpense = _calculateTotalExpense(expenses);
-// //           final remainingBudget = budget - totalExpense;
+// //           final remainingAmount = budget - totalAmount;
 
-// //           return Padding(
-// //             padding: const EdgeInsets.all(16.0),
-// //             child: Column(
-// //               crossAxisAlignment: CrossAxisAlignment.start,
-// //               children: [
-// //                 Text(
-// //                   'Group Details:',
-// //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-// //                 ),
-// //                 SizedBox(height: 10),
-// //                 Text('Total Expense: ₹${totalExpense.toStringAsFixed(2)}'),
-// //                 Text(
-// //                     'Remaining Budget: ₹${remainingBudget.toStringAsFixed(2)}'),
-// //                 SizedBox(height: 20),
-// //                 Text(
-// //                   'Shared Expenses:',
-// //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-// //                 ),
-// //                 SizedBox(height: 10),
-// //                 Expanded(
-// //                   child: ListView.builder(
-// //                     itemCount: expenses.length,
-// //                     itemBuilder: (context, index) {
-// //                       final expense = expenses[index] as Map<String, dynamic>;
-// //                       final expenseMembers =
-// //                           (expense['members'] as List<dynamic>?) ?? [];
+// //           // Fetch member names based on UIDs
+// //           _fetchMemberNames(members);
 
-// //                       return Card(
-// //                         margin: const EdgeInsets.symmetric(vertical: 8.0),
-// //                         child: Padding(
-// //                           padding: const EdgeInsets.all(10.0),
-// //                           child: Column(
-// //                             crossAxisAlignment: CrossAxisAlignment.start,
+// //           // Calculate contributions and shares
+// //           final contributions =
+// //               _calculateMemberContributions(members, expenses);
+// //           final sharePerMember =
+// //               members.isNotEmpty ? totalAmount / members.length : 0.0;
+
+// //           return Container(
+// //             color: const Color(0xFFF2F2F2), // Light gray background
+// //             child: Padding(
+// //               padding: const EdgeInsets.all(16.0),
+// //               child: ListView(
+// //                 children: [
+// //                   // Group Details Card
+// //                   Card(
+// //                     elevation: 4,
+// //                     shape: RoundedRectangleBorder(
+// //                       borderRadius: BorderRadius.circular(12),
+// //                     ),
+// //                     margin: const EdgeInsets.only(bottom: 20),
+// //                     child: Padding(
+// //                       padding: const EdgeInsets.all(20.0),
+// //                       child: Column(
+// //                         crossAxisAlignment: CrossAxisAlignment.start,
+// //                         children: [
+// //                           Row(
 // //                             children: [
+// //                               Icon(Icons.group,
+// //                                   color: const Color(0xFF6200EA), size: 28),
+// //                               SizedBox(width: 10),
 // //                               Text(
-// //                                 'Expense: ${expense['name'] ?? 'Unnamed'}',
+// //                                 'Group Details',
 // //                                 style: TextStyle(
-// //                                     fontSize: 16, fontWeight: FontWeight.bold),
+// //                                     fontSize: 20,
+// //                                     fontWeight: FontWeight.bold,
+// //                                     color: const Color(0xFF6200EA)),
 // //                               ),
-// //                               Text(
-// //                                   'Total Amount: ₹${(expense['amount'] ?? 0.0).toStringAsFixed(2)}'),
-// //                               Divider(),
-// //                               Text(
-// //                                 'Members:',
-// //                                 style: TextStyle(fontWeight: FontWeight.bold),
-// //                               ),
-// //                               if (expenseMembers.isNotEmpty)
-// //                                 ...expenseMembers.map((member) => Padding(
-// //                                       padding: const EdgeInsets.symmetric(
-// //                                           vertical: 4.0),
-// //                                       child: Column(
-// //                                         crossAxisAlignment:
-// //                                             CrossAxisAlignment.start,
-// //                                         children: [
-// //                                           Text(
-// //                                               '${member['name'] ?? 'Unknown'} - Share: ₹${(member['share'] ?? 0.0).toStringAsFixed(2)}'),
-// //                                           TextField(
-// //                                             decoration: InputDecoration(
-// //                                               labelText:
-// //                                                   'Update Share (%) for ${member['name'] ?? 'Member'}',
-// //                                               border: OutlineInputBorder(),
-// //                                             ),
-// //                                             keyboardType:
-// //                                                 TextInputType.numberWithOptions(
-// //                                                     decimal: true),
-// //                                             onChanged: (value) {
-// //                                               final newPercent =
-// //                                                   double.tryParse(value) ?? 0.0;
-// //                                               _updateMemberShare(
-// //                                                   expense, member, newPercent);
-// //                                             },
-// //                                           ),
-// //                                         ],
-// //                                       ),
-// //                                     ))
-// //                               else
-// //                                 Text('No members for this expense.'),
 // //                             ],
 // //                           ),
-// //                         ),
-// //                       );
-// //                     },
+// //                           SizedBox(height: 20),
+// //                           Row(
+// //                             children: [
+// //                               Icon(Icons.monetization_on, color: Colors.green),
+// //                               SizedBox(width: 10),
+// //                               Text(
+// //                                 'Total Expense: \$${totalAmount.toStringAsFixed(2)}',
+// //                                 style: TextStyle(fontSize: 16),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                           SizedBox(height: 10),
+// //                           Row(
+// //                             children: [
+// //                               Icon(Icons.people, color: Colors.blue),
+// //                               SizedBox(width: 10),
+// //                               Text(
+// //                                 'Number of Members: ${members.length}',
+// //                                 style: TextStyle(fontSize: 16),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                           SizedBox(height: 10),
+// //                           Row(
+// //                             children: [
+// //                               Icon(Icons.attach_money, color: Colors.orange),
+// //                               SizedBox(width: 10),
+// //                               Text(
+// //                                 'Budget: \$${budget.toStringAsFixed(2)}',
+// //                                 style: TextStyle(fontSize: 16),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                           SizedBox(height: 10),
+// //                           Row(
+// //                             children: [
+// //                               Icon(Icons.savings, color: Colors.red),
+// //                               SizedBox(width: 10),
+// //                               Text(
+// //                                 'Remaining Budget: \$${remainingAmount.toStringAsFixed(2)}',
+// //                                 style: TextStyle(fontSize: 16),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                         ],
+// //                       ),
+// //                     ),
 // //                   ),
-// //                 ),
-// //               ],
+// //                   // Members List Card with Contributions and Shares
+// //                   Card(
+// //                     elevation: 4,
+// //                     shape: RoundedRectangleBorder(
+// //                       borderRadius: BorderRadius.circular(12),
+// //                     ),
+// //                     child: Padding(
+// //                       padding: const EdgeInsets.all(20.0),
+// //                       child: Column(
+// //                         crossAxisAlignment: CrossAxisAlignment.start,
+// //                         children: [
+// //                           Row(
+// //                             children: [
+// //                               Icon(Icons.person, color: Colors.blue, size: 28),
+// //                               SizedBox(width: 10),
+// //                               Text(
+// //                                 'Members',
+// //                                 style: TextStyle(
+// //                                   fontSize: 20,
+// //                                   fontWeight: FontWeight.bold,
+// //                                   color: Colors.blue,
+// //                                 ),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                           SizedBox(height: 20),
+// //                           ...members.map((member) {
+// //                             final uid = member['uid'];
+// //                             final name = memberNames[uid] ?? 'Loading...';
+// //                             final contribution = contributions[uid] ?? 0.0;
+// //                             return Padding(
+// //                               padding:
+// //                                   const EdgeInsets.symmetric(vertical: 8.0),
+// //                               child: Row(
+// //                                 children: [
+// //                                   Icon(Icons.person_outline,
+// //                                       color: Colors.grey, size: 24),
+// //                                   SizedBox(width: 10),
+// //                                   Expanded(
+// //                                     child: Column(
+// //                                       crossAxisAlignment:
+// //                                           CrossAxisAlignment.start,
+// //                                       children: [
+// //                                         Text(
+// //                                           'Name: $name',
+// //                                           style: TextStyle(fontSize: 16),
+// //                                         ),
+// //                                         Text(
+// //                                           'UID: ${uid ?? 'N/A'}',
+// //                                           style: TextStyle(
+// //                                             fontSize: 14,
+// //                                             color: Colors.grey[600],
+// //                                           ),
+// //                                         ),
+// //                                         Text(
+// //                                           'Contribution: \$${contribution.toStringAsFixed(2)}',
+// //                                           style: TextStyle(
+// //                                             fontSize: 14,
+// //                                             color: Colors.green,
+// //                                           ),
+// //                                         ),
+// //                                         Text(
+// //                                           'Share: \$${sharePerMember.toStringAsFixed(2)}',
+// //                                           style: TextStyle(
+// //                                             fontSize: 14,
+// //                                             color: Colors.orange,
+// //                                           ),
+// //                                         ),
+// //                                       ],
+// //                                     ),
+// //                                   ),
+// //                                 ],
+// //                               ),
+// //                             );
+// //                           }).toList(),
+// //                         ],
+// //                       ),
+// //                     ),
+// //                   ),
+// //                 ],
+// //               ),
 // //             ),
 // //           );
 // //         },
-// //       ),
-// //       bottomNavigationBar: Padding(
-// //         padding: const EdgeInsets.all(16.0),
-// //         child: ElevatedButton(
-// //           onPressed: () async {
-// //             try {
-// //               final snapshot = await groupRef.get();
-// //               final groupData = snapshot.data() as Map<String, dynamic>;
-// //               final members = groupData['members'] as List<dynamic>? ?? [];
-// //               final totalExpense = _calculateTotalExpense(
-// //                   groupData['expenses'] as List<dynamic>);
-
-// //               if (members.isNotEmpty) {
-// //                 final splitAmount = totalExpense / members.length;
-
-// //                 members.forEach((member) {
-// //                   member['share'] = splitAmount;
-// //                 });
-
-// //                 await groupRef.update({'members': members});
-// //                 ScaffoldMessenger.of(context).showSnackBar(
-// //                   SnackBar(content: Text('Bill split successfully!')),
-// //                 );
-// //               } else {
-// //                 ScaffoldMessenger.of(context).showSnackBar(
-// //                   SnackBar(content: Text('No members to split the bill.')),
-// //                 );
-// //               }
-// //             } catch (e) {
-// //               ScaffoldMessenger.of(context).showSnackBar(
-// //                 SnackBar(content: Text('Error splitting the bill: $e')),
-// //               );
-// //             }
-// //           },
-// //           child: Text('Split Bill'),
-// //         ),
 // //       ),
 // //     );
 // //   }
 // // }
 // import 'package:flutter/material.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth for user details
 
 // class ExpenseSharingPage extends StatefulWidget {
 //   final String groupId;
@@ -598,63 +530,78 @@
 // }
 
 // class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
-//   final TextEditingController _inviteEmailController = TextEditingController();
-//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-//   final FirebaseAuth _auth = FirebaseAuth.instance;
+//   late DocumentReference groupRef;
+//   Map<String, String> memberNames = {}; // Cache for UID-to-Name mapping
 
-//   // Function to invite a new member
-//   void _inviteMember() {
-//     String email = _inviteEmailController.text.trim();
-//     if (email.isNotEmpty) {
-//       _firestore
-//           .collection('users')
-//           .where('email', isEqualTo: email)
-//           .get()
-//           .then((querySnapshot) {
-//         if (querySnapshot.docs.isNotEmpty) {
-//           var userDoc = querySnapshot.docs.first;
-//           _firestore.collection('groups').doc(widget.groupId).update({
-//             'members': FieldValue.arrayUnion(
-//                 [userDoc.id]) // Add the user's UID to the group members
+//   @override
+//   void initState() {
+//     super.initState();
+//     groupRef =
+//         FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+//   }
+
+//   Future<void> _fetchMemberNames(List members) async {
+//     final usersCollection = FirebaseFirestore.instance.collection('users');
+
+//     for (var member in members) {
+//       final uid = member['uid'];
+//       if (uid != null && !memberNames.containsKey(uid)) {
+//         try {
+//           // Fetch user document from Firestore
+//           final userDoc = await usersCollection.doc(uid).get();
+//           if (userDoc.exists) {
+//             setState(() {
+//               memberNames[uid] = userDoc['name'] ?? 'Unknown';
+//             });
+//           } else {
+//             setState(() {
+//               memberNames[uid] = 'Unknown';
+//             });
+//           }
+//         } catch (e) {
+//           // Handle errors
+//           setState(() {
+//             memberNames[uid] = 'Error';
 //           });
-
-//           // Send an invite email or notification (if required)
-//           ScaffoldMessenger.of(context).showSnackBar(
-//             SnackBar(content: Text('Invite sent to $email!')),
-//           );
-
-//           _inviteEmailController.clear();
-//         } else {
-//           ScaffoldMessenger.of(context).showSnackBar(
-//             SnackBar(content: Text('User not found!')),
-//           );
 //         }
-//       });
+//       }
 //     }
 //   }
 
-//   // Fetch group members
-//   Stream<List<String>> _fetchGroupMembers() {
-//     return _firestore
-//         .collection('groups')
-//         .doc(widget.groupId)
-//         .snapshots()
-//         .map((snapshot) {
-//       List<dynamic> members = snapshot.data()?['members'] ?? [];
-//       return List<String>.from(members);
-//     });
+//   double _calculateTotalExpense(List expenses) {
+//     double total = 0;
+//     for (var expense in expenses) {
+//       total += expense['amount'] ?? 0.0;
+//     }
+//     return total;
 //   }
 
-//   // Fetch shared expenses for group members
-//   Stream<List<Map<String, dynamic>>> _fetchSharedExpenses() {
-//     return _firestore
-//         .collection('groups')
-//         .doc(widget.groupId)
-//         .snapshots()
-//         .map((snapshot) {
-//       List<dynamic> expenses = snapshot.data()?['expenses'] ?? [];
-//       return List<Map<String, dynamic>>.from(expenses);
-//     });
+//   Map<String, double> _calculateMemberContributions(
+//       List members, List expenses) {
+//     Map<String, double> contributions = {};
+
+//     // Initialize contributions for all members
+//     for (var member in members) {
+//       final uid = member['uid'];
+//       if (uid != null) {
+//         contributions[uid] = 0.0;
+//       }
+//     }
+
+//     // Iterate over expenses and handle spentBy as an array
+//     for (var expense in expenses) {
+//       final spendByList = expense['spentBy'] ?? [];
+//       final amount = (expense['amount'] ?? 0).toDouble();
+
+//       // Add the amount for each member in the spentBy array
+//       for (var uid in spendByList) {
+//         if (contributions.containsKey(uid)) {
+//           contributions[uid] = (contributions[uid] ?? 0.0) + amount;
+//         }
+//       }
+//     }
+
+//     return contributions;
 //   }
 
 //   @override
@@ -662,232 +609,475 @@
 //     return Scaffold(
 //       appBar: AppBar(
 //         title: Text('Expense Sharing'),
-//         leading: BackButton(),
+//         backgroundColor: const Color(0xFF6200EA),
 //       ),
-//       body: Padding(
-//         padding: const EdgeInsets.all(16.0),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             // Invite member section
-//             Row(
-//               children: [
-//                 Expanded(
-//                   child: TextField(
-//                     controller: _inviteEmailController,
-//                     decoration: InputDecoration(
-//                       labelText: 'Invite by Email',
-//                       border: OutlineInputBorder(),
+//       body: FutureBuilder<DocumentSnapshot>(
+//         future: groupRef.get(),
+//         builder: (context, snapshot) {
+//           if (snapshot.connectionState == ConnectionState.waiting) {
+//             return Center(child: CircularProgressIndicator());
+//           }
+
+//           if (!snapshot.hasData || snapshot.data!.data() == null) {
+//             return Center(child: Text('No data available'));
+//           }
+
+//           final groupData =
+//               snapshot.data!.data() as Map<String, dynamic>? ?? {};
+//           final expenses = (groupData['expenses'] as List?) ?? [];
+//           final totalAmount = _calculateTotalExpense(expenses);
+//           final members = (groupData['members'] as List?) ?? [];
+//           final budget = groupData['budget'] ?? 0.0;
+//           final remainingAmount = budget - totalAmount;
+
+//           // Fetch member names based on UIDs
+//           _fetchMemberNames(members);
+
+//           // Calculate contributions and shares
+//           final contributions =
+//               _calculateMemberContributions(members, expenses);
+//           final sharePerMember =
+//               members.isNotEmpty ? totalAmount / members.length : 0.0;
+
+//           return Container(
+//             color: const Color(0xFFF2F2F2), // Light gray background
+//             child: Padding(
+//               padding: const EdgeInsets.all(16.0),
+//               child: ListView(
+//                 children: [
+//                   // Group Details Card
+//                   Card(
+//                     elevation: 4,
+//                     shape: RoundedRectangleBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                     margin: const EdgeInsets.only(bottom: 20),
+//                     child: Padding(
+//                       padding: const EdgeInsets.all(20.0),
+//                       child: Column(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Row(
+//                             children: [
+//                               Icon(Icons.group,
+//                                   color: const Color(0xFF6200EA), size: 28),
+//                               SizedBox(width: 10),
+//                               Text(
+//                                 'Group Details',
+//                                 style: TextStyle(
+//                                     fontSize: 20,
+//                                     fontWeight: FontWeight.bold,
+//                                     color: const Color(0xFF6200EA)),
+//                               ),
+//                             ],
+//                           ),
+//                           SizedBox(height: 20),
+//                           Row(
+//                             children: [
+//                               Icon(Icons.monetization_on, color: Colors.green),
+//                               SizedBox(width: 10),
+//                               Text(
+//                                 'Total Expense: \$${totalAmount.toStringAsFixed(2)}',
+//                                 style: TextStyle(fontSize: 16),
+//                               ),
+//                             ],
+//                           ),
+//                           SizedBox(height: 10),
+//                           Row(
+//                             children: [
+//                               Icon(Icons.people, color: Colors.blue),
+//                               SizedBox(width: 10),
+//                               Text(
+//                                 'Number of Members: ${members.length}',
+//                                 style: TextStyle(fontSize: 16),
+//                               ),
+//                             ],
+//                           ),
+//                           SizedBox(height: 10),
+//                           Row(
+//                             children: [
+//                               Icon(Icons.attach_money, color: Colors.orange),
+//                               SizedBox(width: 10),
+//                               Text(
+//                                 'Budget: \$${budget.toStringAsFixed(2)}',
+//                                 style: TextStyle(fontSize: 16),
+//                               ),
+//                             ],
+//                           ),
+//                           SizedBox(height: 10),
+//                           Row(
+//                             children: [
+//                               Icon(Icons.savings, color: Colors.red),
+//                               SizedBox(width: 10),
+//                               Text(
+//                                 'Remaining Budget: \$${remainingAmount.toStringAsFixed(2)}',
+//                                 style: TextStyle(fontSize: 16),
+//                               ),
+//                             ],
+//                           ),
+//                         ],
+//                       ),
 //                     ),
 //                   ),
-//                 ),
-//                 IconButton(
-//                   icon: Icon(Icons.send),
-//                   onPressed: _inviteMember,
-//                 ),
-//               ],
-//             ),
-//             SizedBox(height: 20),
-//             // List of Group Members
-//             Text('Group Members:',
-//                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-//             SizedBox(height: 10),
-//             StreamBuilder<List<String>>(
-//               stream: _fetchGroupMembers(),
-//               builder: (context, snapshot) {
-//                 if (snapshot.connectionState == ConnectionState.waiting) {
-//                   return Center(child: CircularProgressIndicator());
-//                 }
-
-//                 if (!snapshot.hasData) {
-//                   return Center(child: Text('No members found'));
-//                 }
-
-//                 final members = snapshot.data!;
-//                 return Expanded(
-//                   child: ListView.builder(
-//                     itemCount: members.length,
-//                     itemBuilder: (context, index) {
-//                       return ListTile(
-//                         title:
-//                             Text(members[index]), // Display user name or email
-//                       );
-//                     },
+//                   // Members List Card with Contributions and Shares
+//                   Card(
+//                     elevation: 4,
+//                     shape: RoundedRectangleBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                     child: Padding(
+//                       padding: const EdgeInsets.all(20.0),
+//                       child: Column(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Row(
+//                             children: [
+//                               Icon(Icons.person, color: Colors.blue, size: 28),
+//                               SizedBox(width: 10),
+//                               Text(
+//                                 'Members',
+//                                 style: TextStyle(
+//                                   fontSize: 20,
+//                                   fontWeight: FontWeight.bold,
+//                                   color: Colors.blue,
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                           SizedBox(height: 20),
+//                           ...members.map((member) {
+//                             final uid = member['uid'];
+//                             final name = memberNames[uid] ?? 'Loading...';
+//                             final contribution = contributions[uid] ?? 0.0;
+//                             return Padding(
+//                               padding:
+//                                   const EdgeInsets.symmetric(vertical: 8.0),
+//                               child: Row(
+//                                 children: [
+//                                   Icon(Icons.person_outline,
+//                                       color: Colors.grey, size: 24),
+//                                   SizedBox(width: 10),
+//                                   Expanded(
+//                                     child: Column(
+//                                       crossAxisAlignment:
+//                                           CrossAxisAlignment.start,
+//                                       children: [
+//                                         Text(
+//                                           'Name: $name',
+//                                           style: TextStyle(fontSize: 16),
+//                                         ),
+//                                         Text(
+//                                           'UID: ${uid ?? 'N/A'}',
+//                                           style: TextStyle(
+//                                             fontSize: 14,
+//                                             color: Colors.grey[600],
+//                                           ),
+//                                         ),
+//                                         Text(
+//                                           'Contribution: \$${contribution.toStringAsFixed(2)}',
+//                                           style: TextStyle(
+//                                             fontSize: 14,
+//                                             color: Colors.green,
+//                                           ),
+//                                         ),
+//                                         Text(
+//                                           'Share: \$${sharePerMember.toStringAsFixed(2)}',
+//                                           style: TextStyle(
+//                                             fontSize: 14,
+//                                             color: Colors.orange,
+//                                           ),
+//                                         ),
+//                                       ],
+//                                     ),
+//                                   ),
+//                                 ],
+//                               ),
+//                             );
+//                           }).toList(),
+//                         ],
+//                       ),
+//                     ),
 //                   ),
-//                 );
-//               },
+//                 ],
+//               ),
 //             ),
-//             SizedBox(height: 20),
-//             // List of Shared Expenses
-//             Text('Shared Expenses:',
-//                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-//             SizedBox(height: 10),
-//             StreamBuilder<List<Map<String, dynamic>>>(
-//               stream: _fetchSharedExpenses(),
-//               builder: (context, snapshot) {
-//                 if (snapshot.connectionState == ConnectionState.waiting) {
-//                   return Center(child: CircularProgressIndicator());
-//                 }
-
-//                 if (!snapshot.hasData) {
-//                   return Center(child: Text('No shared expenses found'));
-//                 }
-
-//                 final expenses = snapshot.data!;
-//                 return Expanded(
-//                   child: ListView.builder(
-//                     itemCount: expenses.length,
-//                     itemBuilder: (context, index) {
-//                       final expense = expenses[index];
-//                       return ListTile(
-//                         title: Text(expense['name']),
-//                         subtitle:
-//                             Text('₹${expense['amount'].toStringAsFixed(2)}'),
-//                       );
-//                     },
-//                   ),
-//                 );
-//               },
-//             ),
-//           ],
-//         ),
+//           );
+//         },
 //       ),
 //     );
 //   }
 // }
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore package
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ExpenseSharingPage extends StatelessWidget {
+class ExpenseSharingPage extends StatefulWidget {
   final String groupId;
   ExpenseSharingPage({required this.groupId});
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  @override
+  _ExpenseSharingPageState createState() => _ExpenseSharingPageState();
+}
 
-  // Function to fetch and display expenses
-  Stream<DocumentSnapshot> _fetchGroupData() {
-    return _firestore.collection('groups').doc(groupId).snapshots();
+class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
+  late DocumentReference groupRef;
+  Map<String, String> memberNames = {}; // Cache for UID-to-Name mapping
+  Map<String, TextEditingController> splitControllers = {};
+  Map<String, double> splitPercentages = {}; // Store entered split percentages
+
+  @override
+  void initState() {
+    super.initState();
+    groupRef =
+        FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+  }
+
+  Future<void> _fetchMemberNames(List members) async {
+    final usersCollection = FirebaseFirestore.instance.collection('users');
+
+    for (var member in members) {
+      final uid = member['uid'];
+      if (uid != null && !memberNames.containsKey(uid)) {
+        try {
+          // Fetch user document from Firestore
+          final userDoc = await usersCollection.doc(uid).get();
+          if (userDoc.exists) {
+            setState(() {
+              memberNames[uid] = userDoc['name'] ?? 'Unknown';
+            });
+          } else {
+            setState(() {
+              memberNames[uid] = 'Unknown';
+            });
+          }
+        } catch (e) {
+          setState(() {
+            memberNames[uid] = 'Error';
+          });
+        }
+      }
+    }
   }
 
   double _calculateTotalExpense(List expenses) {
     double total = 0;
     for (var expense in expenses) {
-      total += expense['amount'];
+      total += expense['amount'] ?? 0.0;
     }
     return total;
   }
 
+  Map<String, double> _calculateMemberContributions(
+      List members, List expenses) {
+    Map<String, double> contributions = {};
+
+    for (var member in members) {
+      final uid = member['uid'];
+      if (uid != null) {
+        contributions[uid] = 0.0;
+      }
+    }
+
+    for (var expense in expenses) {
+      final spendByList = expense['spentBy'] ?? [];
+      final amount = (expense['amount'] ?? 0).toDouble();
+
+      for (var uid in spendByList) {
+        if (contributions.containsKey(uid)) {
+          contributions[uid] = (contributions[uid] ?? 0.0) + amount;
+        }
+      }
+    }
+
+    return contributions;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _fetchGroupData(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text('Loading Expenses...'),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Expense Sharing'),
+        backgroundColor: const Color(0xFF6200EA),
+      ),
+      body: FutureBuilder<DocumentSnapshot>(
+        future: groupRef.get(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || snapshot.data!.data() == null) {
+            return Center(child: Text('No data available'));
+          }
+
+          final groupData =
+              snapshot.data!.data() as Map<String, dynamic>? ?? {};
+          final expenses = (groupData['expenses'] as List?) ?? [];
+          final totalAmount = _calculateTotalExpense(expenses);
+          final members = (groupData['members'] as List?) ?? [];
+          final budget = groupData['budget'] ?? 0.0;
+
+          _fetchMemberNames(members);
+          final contributions =
+              _calculateMemberContributions(members, expenses);
+
+          return Container(
+            color: const Color(0xFFF2F2F2),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ListView(
+                children: [
+                  // Group Details Card
+                  _buildGroupDetailsCard(totalAmount, members.length, budget),
+                  // Members List Card
+                  _buildMembersListCard(members, contributions, totalAmount),
+                  SizedBox(height: 20),
+                  // New Split Card with % Input
+                  _buildSplitPercentageCard(members, totalAmount),
+                ],
+              ),
             ),
-            body: Center(child: CircularProgressIndicator()),
           );
-        }
+        },
+      ),
+    );
+  }
 
-        if (!snapshot.hasData || !snapshot.data!.exists) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text('Error'),
-            ),
-            body: Center(child: Text('Failed to load group data')),
-          );
-        }
-
-        final groupData = snapshot.data!.data() as Map<String, dynamic>;
-        final totalExpense = _calculateTotalExpense(groupData['expenses']);
-
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              '${groupData['name']} - Expense Sharing',
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: const Color(0xFF6200EA),
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  // Group Details Card
+  Widget _buildGroupDetailsCard(
+      double totalAmount, int memberCount, double budget) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Center(
-                  child: Card(
-                    elevation: 5,
-                    margin: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Total Expenses',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF6200EA),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            '₹${totalExpense.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF6200EA),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: groupData['expenses'].length,
-                    itemBuilder: (context, index) {
-                      final expense = groupData['expenses'][index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          title: Text(expense['name']),
-                          subtitle: Text(
-                              'Spent by: ${expense['spentBy'].join(', ')}'),
-                          trailing:
-                              Text('₹${expense['amount'].toStringAsFixed(2)}'),
-                          // Implement edit logic similar to what is done in GroupDetailsPage
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                Icon(Icons.group, color: const Color(0xFF6200EA), size: 28),
+                SizedBox(width: 10),
+                Text('Group Details',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF6200EA))),
               ],
             ),
-          ),
-          bottomNavigationBar: BottomNavigationBar(
-            items: [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.arrow_back),
-                label: 'Back to Group Details',
-              ),
-            ],
-            onTap: (index) {
-              if (index == 0) {
-                Navigator.pop(context);
-              }
-            },
-          ),
-        );
-      },
+            SizedBox(height: 20),
+            Text('Total Expense: \$${totalAmount.toStringAsFixed(2)}'),
+            Text('Number of Members: $memberCount'),
+            Text('Budget: \$${budget.toStringAsFixed(2)}'),
+            Text(
+                'Remaining Budget: \$${(budget - totalAmount).toStringAsFixed(2)}'),
+          ],
+        ),
+      ),
     );
+  }
+
+  // Members List Card
+  Widget _buildMembersListCard(
+      List members, Map<String, double> contributions, double totalAmount) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: members.map((member) {
+            final uid = member['uid'];
+            final name = memberNames[uid] ?? 'Loading...';
+            final contribution = contributions[uid] ?? 0.0;
+
+            return ListTile(
+              leading: Icon(Icons.person, color: Colors.blue),
+              title: Text('$name'),
+              subtitle:
+                  Text('Contribution: \$${contribution.toStringAsFixed(2)}'),
+              trailing: Text(
+                'Remaining: \$${(totalAmount - contribution).toStringAsFixed(2)}',
+                style: TextStyle(color: Colors.red),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  // Split Percentage Card
+  Widget _buildSplitPercentageCard(List members, double totalAmount) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.calculate, color: Colors.green, size: 28),
+                SizedBox(width: 10),
+                Text('Split Expense',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    )),
+              ],
+            ),
+            SizedBox(height: 10),
+            Column(
+              children: members.map((member) {
+                final uid = member['uid'];
+                final name = memberNames[uid] ?? 'Loading...';
+                splitControllers[uid] ??= TextEditingController();
+
+                return Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Text('$name'),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: splitControllers[uid],
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'Split %',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            splitPercentages[uid] =
+                                double.tryParse(value) ?? 0.0;
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'Share: \$${_calculateSplit(totalAmount, uid).toStringAsFixed(2)}',
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _calculateSplit(double totalAmount, String uid) {
+    final percentage = splitPercentages[uid] ?? (100 / splitControllers.length);
+    return totalAmount * (percentage / 100);
   }
 }
