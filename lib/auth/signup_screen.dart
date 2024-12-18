@@ -1,11 +1,11 @@
 import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_tracker/auth/login_screen.dart';
 import 'package:finance_tracker/pages/home_screen.dart';
 import 'package:finance_tracker/widgets/button.dart';
 import 'package:finance_tracker/widgets/textfield.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_tracker/auth/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -38,8 +38,10 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Column(
           children: [
             const Spacer(),
-            const Text("Signup",
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.w500)),
+            const Text(
+              "Signup",
+              style: TextStyle(fontSize: 40, fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 50),
             CustomTextField(
               hint: "Enter Name",
@@ -72,14 +74,18 @@ class _SignupScreenState extends State<SignupScreen> {
               onPressed: _signup,
             ),
             const SizedBox(height: 5),
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Text("Already have an account? "),
-              InkWell(
-                onTap: () => goToLogin(context),
-                child: const Text("Login", style: TextStyle(color: Colors.red)),
-              )
-            ]),
-            const Spacer()
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("Already have an account? "),
+                InkWell(
+                  onTap: () => goToLogin(context),
+                  child:
+                      const Text("Login", style: TextStyle(color: Colors.red)),
+                )
+              ],
+            ),
+            const Spacer(),
           ],
         ),
       ),
@@ -132,37 +138,57 @@ class _SignupScreenState extends State<SignupScreen> {
           _email.text, _password.text);
 
       if (user != null) {
-        final uid = user.uid; // Fetch the UID
+        // Send email verification
+        await user.sendEmailVerification();
+        log("Verification email sent to: ${user.email}");
 
-        // Save user data to Firestore
+        // Show a dialog prompting the user to verify their email
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text("Verify Your Email"),
+            content: const Text(
+                "A verification email has been sent to your email address. Please verify it before continuing."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  goToLogin(context);
+                },
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+
+        // Save user data to Firestore temporarily (can be confirmed later after email verification)
+        final uid = user.uid; // Fetch the UID
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
-          'uid': uid, // Store UID explicitly in Firestore
+          'uid': uid,
           'name': _name.text,
           'email': _email.text,
           'accountType': 'basic',
+          'emailVerified': false, // Default to false until user verifies email
           'creationDate': FieldValue.serverTimestamp(),
         });
 
-        // Initialize user's expenses collection
+        // Optionally, initialize other collections (expenses/reminders)
         await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
             .collection('expenses')
-            .add({
-          'initialExpense': '0',
-        });
+            .add({'initialExpense': '0'});
 
-        // Initialize user's reminders collection
         await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
             .collection('reminders')
             .add({
-          'reminderMessage': 'Welcome to your personal finance tracker!',
+          'reminderMessage': 'Welcome to your personal finance tracker!'
         });
 
-        log("User created successfully with UID: $uid");
-        goToHome(context, uid); // Navigate to the HomeScreen
+        log("User data saved temporarily. Waiting for email verification.");
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
