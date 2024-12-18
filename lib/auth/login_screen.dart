@@ -1,11 +1,11 @@
+
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:finance_tracker/auth/auth_service.dart';
 import 'package:finance_tracker/auth/signup_screen.dart';
 import 'package:finance_tracker/widgets/button.dart';
 import 'package:finance_tracker/widgets/textfield.dart';
-import 'package:finance_tracker/pages/home_screen.dart'; // Update to include HomeScreen
-
+import 'package:finance_tracker/pages/home_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   String? _emailError;
   String? _passwordError;
+  String? _verificationError;
 
   @override
   void dispose() {
@@ -34,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _emailError = null;
       _passwordError = null;
+      _verificationError = null;
     });
 
     bool isValid = true;
@@ -69,21 +71,34 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (user != null) {
-          log("User Logged In with UID: ${user.uid}"); // Access and log the UID
+          if (!user.emailVerified) {
+            setState(() {
+              _verificationError =
+                  "Please verify your email before logging in.";
+            });
+            // Show a snackbar with an option to resend email
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text(
+                    "Email not verified. Resend verification email?"),
+                action: SnackBarAction(
+                  label: "RESEND",
+                  onPressed: () => _resendVerificationEmail(user),
+                ),
+              ),
+            );
+            return;
+          }
 
-          // Fetch user's unique data from Firestore using UID
+          log("User Logged In with UID: ${user.uid}");
           await _fetchUserData(user.uid);
-
-          // Navigate to the Home Screen
-          goToHome(context, user.uid); // Pass the user UID as an argument
+          goToHome(context, user.uid);
         } else {
-          // Show error if login fails
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Invalid email or password")),
           );
         }
       } catch (e) {
-        // Handle Firebase errors
         if (e.toString().contains('too-many-requests')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -99,21 +114,35 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Method to fetch user-specific data using UID
+  // Method to resend email verification
+  Future<void> _resendVerificationEmail(user) async {
+    try {
+      await user.sendEmailVerification();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text("Verification email has been resent. Check your inbox.")),
+      );
+    } catch (e) {
+      log("Error resending verification email: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Failed to resend verification email. Try again.")),
+      );
+    }
+  }
+
+  // Fetch user-specific data
   Future<void> _fetchUserData(String userId) async {
     try {
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(userId) // Use UID as the document ID
+          .doc(userId)
           .get();
 
       if (userDoc.exists) {
-        // Retrieve user data from Firestore
         var userData = userDoc.data();
         log('User data: $userData');
-
-        // Perform actions with the user data
-        // For example, store the data locally or initialize user-specific features
       } else {
         log('User data not found for UID: $userId');
       }
@@ -173,6 +202,11 @@ class _LoginScreenState extends State<LoginScreen> {
             if (_passwordError != null)
               Text(
                 _passwordError!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            if (_verificationError != null)
+              Text(
+                _verificationError!,
                 style: const TextStyle(color: Colors.red),
               ),
             const SizedBox(height: 30),
