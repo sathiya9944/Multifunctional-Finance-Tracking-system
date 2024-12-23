@@ -208,8 +208,13 @@ class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
     );
   }
 
-  // Split Percentage Card
+// Split Percentage Card
   Widget _buildSplitPercentageCard(List members, double totalAmount) {
+    double totalEnteredPercentage = splitPercentages.values.fold(
+      0.0,
+      (sum, percentage) => sum + percentage,
+    );
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -257,6 +262,28 @@ class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
                           setState(() {
                             splitPercentages[uid] =
                                 double.tryParse(value) ?? 0.0;
+                            totalEnteredPercentage =
+                                splitPercentages.values.fold(
+                              0.0,
+                              (sum, percentage) => sum + percentage,
+                            );
+
+                            // If total exceeds 100%, reset the value and show error
+                            if (totalEnteredPercentage > 100.0) {
+                              splitControllers[uid]?.text = '';
+                              splitPercentages[uid] = 0.0;
+                              totalEnteredPercentage = splitPercentages.values
+                                  .fold(0.0,
+                                      (sum, percentage) => sum + percentage);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Total percentage cannot exceed 100%.',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              );
+                            }
                           });
                         },
                       ),
@@ -272,6 +299,21 @@ class _ExpenseSharingPageState extends State<ExpenseSharingPage> {
                 );
               }).toList(),
             ),
+            SizedBox(height: 10),
+            // Remaining Percentage
+            Text(
+              'Total Entered Percentage: ${totalEnteredPercentage.toStringAsFixed(2)}%',
+              style: TextStyle(
+                color:
+                    totalEnteredPercentage == 100.0 ? Colors.green : Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (totalEnteredPercentage != 100.0)
+              Text(
+                'Ensure the total percentage equals 100%',
+                style: TextStyle(color: Colors.red),
+              ),
           ],
         ),
       ),
